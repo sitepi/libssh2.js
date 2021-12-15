@@ -58,13 +58,6 @@ ssize_t recv(int sockfd, void *buffer, size_t length, int flags)
 	return clients[sockfd]->recv(buffer, length, flags);
 }
 
-#if 0
-ssize_t recvfrom(int sockfd, void *buffer, size_t length, int flags, struct sockaddr *address, socklen_t *address_len)
-{
-	return recv(sockfd, buffer, length, flags);
-}
-#endif
-
 ssize_t send(int sockfd, const void *buffer, size_t length, int flags) 
 {
 	auto client = clients.find(sockfd);
