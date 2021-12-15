@@ -1,0 +1,54 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<script src="../build/libssh2.js"></script>
+<script>
+	let SESSION;
+	Module().then((libssh2) => {
+		console.log(libssh2);
+		SESSION = libssh2.SESSION;
+		
+		test();
+	});
+
+let client;
+function test()
+{
+	console.log('test');
+	const url = 'ws://127.0.0.1:7681/xxx';
+	const ws = new WebSocket(url);
+	ws.binaryType = 'arraybuffer';
+	
+	ws.onopen = function() {
+		console.log('WebSocket opened');
+	}
+
+	ws.onerror = function() {
+		console.log('WebSocket error');
+	}
+	ws.onclose = function() {
+		console.error('WebSocket disconnected');
+
+		delete client;
+	}
+	
+	ws.onmessage = function(e)  {
+		console.log('got', e.data);
+		client.pushdata(e.data);
+	}
+
+	client = new SESSION(ws);
+
+	client.send = function(buffer, length) {
+		console.log('to raw', length, buffer.length);
+		ws.send(buffer);
+	}
+}
+
+</script>
+</head>
+<body>
+</body>
+</html>
