@@ -3,13 +3,15 @@
 <html lang="en">
 <head>
 
-<script src="../build/libssh2.js"></script>
+<script src="../dist/libssh2.js"></script>
 <script>
 	let SESSION;
 	Module().then((libssh2) => {
 		console.log(libssh2);
 		SESSION = libssh2.SESSION;
-		
+
+		libssh2.init(0);
+
 		test();
 	});
 
