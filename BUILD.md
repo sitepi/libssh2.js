@@ -73,7 +73,6 @@ LibSSH2 over Stream(WebSocket | WebRTC | Socket) on browser | nodejs
 
 	or
 	
-	cd ..
 	websockify 8100 127.0.0.1:22 & 
 	python3 -m http.server
 	visit http://host:8000/tests/test.html 
