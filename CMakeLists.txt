@@ -4,6 +4,10 @@ project(libssh2-js
 	VERSION 0.0.1
 	LANGUAGES CXX)
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS ON)
+
 if(NOT CMAKE_SYSTEM_NAME MATCHES "Emscripten")
 	message(FATAL_ERROR "libssh2-js must be compiled with Emscripten.")
 endif()
@@ -12,6 +16,7 @@ set(LIBSSH2_JS_PROG libssh2)
 
 set(LIBSSH2_JS_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(LIBSSH2_JS_SRC
+	${LIBSSH2_JS_SRC_DIR}/ssh2.cpp
 	${LIBSSH2_JS_SRC_DIR}/ssh2-session.cpp
 	${LIBSSH2_JS_SRC_DIR}/ssh2-channel.cpp
 	${LIBSSH2_JS_SRC_DIR}/ssh2-sftp.cpp

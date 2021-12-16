@@ -64,11 +64,17 @@ LibSSH2 over Stream(WebSocket | WebRTC | Socket) on browser | nodejs
 	cd ../../
 
 ## libssh2.js build
-	mkdir build && cd build
+	cd dist
 	emcmake cmake -DCMAKE_BUILD_TYPE=Release ..
 	emmake make
 
 ## test
+	node ../tests/test.js
+
+	or
+	
+	cd ..
 	websockify 8100 127.0.0.1:22 & 
-	python3 -m http.server 
+	python3 -m http.server
+	visit http://host:8000/tests/test.html 
 
