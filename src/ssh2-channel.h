@@ -1,11 +1,9 @@
 /*
- * Sample showing how to do SSH2 connect.
  *
- * The sample code has default values for host name, user name, password
- * and path to copy, but you can specify them on the command line like:
- *
- * "ssh2 host user password [-p|-i|-k]"
  */
+#ifndef _SSH2_CHANNEL_H_
+#define _SSH2_CHANNEL_H_
+
 #include "libssh2_config.h"
 #include <libssh2.h>
 #include <libssh2_sftp.h>
@@ -13,11 +11,9 @@
 #include <emscripten.h>
 #include <emscripten/bind.h>
 
-static bool libssh2_loaded = false;
-
 class CHANNEL {
 public:
-	CHANNEL(emscripten::val handler)
+	CHANNEL(emscripten::val handle)
 	{
 		channel = libssh2_channel_open_session(session);
 		if(!channel) {
@@ -28,6 +24,12 @@ public:
 		}
 	}
 
+	CHANNEL(LIBSSH2_SESSION *sess, LIBSSH2_CHANNEL *ch) :
+		session(sess),
+		channel(ch)
+	{
+
+	}
 	int get_exit_signal() {
 		return libssh2_channel_get_exit_signal(channel, NULL, NULL, NULL, NULL, NULL, NULL);
 	}
@@ -44,8 +46,8 @@ public:
 		return libssh2_channel_eof(channel);
 	}
 
-	int exec() {
-		return libssh2_channel_exec(channel, NULL);
+	int exec(std::string cmd) {
+		return libssh2_channel_exec(channel, cmd.c_str());
 	}
 
 	int flush() {
@@ -67,19 +69,20 @@ public:
                 }
         }
 
-	int read_stderr() {
+	int read_stderr()
+	{
 		return libssh2_channel_read_stderr(channel, NULL, 0);
 	}
 
 	int request_pty() 
 	{
-		int rc = libssh2_channel_request_pty(channel, "vanilla");
+		int rc = libssh2_channel_request_pty(channel, "xterm");
 		if(rc == LIBSSH2_ERROR_EAGAIN) {
 
 		}
 		else if (rc) {
 			int err = libssh2_session_last_errno(session);
-			printf("request pty failed: %d %d\n", rc, err);
+			fprintf(stderr, "request pty failed: %d %d\n", rc, err);
 		}
 		else {
 			fprintf(stderr, "request pty ok\n");
@@ -87,8 +90,10 @@ public:
 		return 0;
 	}
 
-	int setenv() {
-		return libssh2_channel_setenv(channel, NULL, NULL);
+	int setenv(std::string name, std::string value)
+	{
+		return libssh2_channel_setenv(channel, 
+					name.c_str(), value.c_str());
 	}
 
 	int shell() 
@@ -108,12 +113,16 @@ public:
 	}
 
 	int write(std::string cmd) {
-		int len = libssh2_channel_write(channel, cmd.c_str(), cmd.length());
+		int len = libssh2_channel_write(channel, 
+				cmd.c_str(), 
+				cmd.length());
 		return 0;
 	}
 
 	int write_stderr(std::string cmd) {
-                int len = libssh2_channel_write_stderr(channel, cmd.c_str(), cmd.length());
+                int len = libssh2_channel_write_stderr(channel, 
+				cmd.c_str(), 
+				cmd.length());
                 return 0;
         }
 
@@ -121,3 +130,6 @@ private:
 	LIBSSH2_SESSION *session;
 	LIBSSH2_CHANNEL *channel;
 };
+
+#endif /* ~_SSH2_CHANNEL_H_ */
+

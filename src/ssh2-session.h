@@ -1,11 +1,8 @@
 /*
- * Sample showing how to do SSH2 connect.
  *
- * The sample code has default values for host name, user name, password
- * and path to copy, but you can specify them on the command line like:
- *
- * "ssh2 host user password [-p|-i|-k]"
  */
+#ifndef _SSH2_SESSION_H_
+#define _SSH2_SESSION_H_
 
 #include <libssh2.h>
 #include <libssh2_sftp.h>
@@ -17,29 +14,20 @@
 #include <iostream>
 #include <queue>
 
-#include <emscripten.h>
 #include <emscripten/bind.h>
 
+#include "ssh2-channel.h"
+#include "ssh2-sftp.h"
 
-static bool libssh2_loaded = false;
+using namespace std;
 
 class SESSION {
 public:
-	SESSION(emscripten::val handler) :
-		handler(handler),
+	SESSION(emscripten::val handle) :
+		handle(handle),
 		startup(false),
 		has_shell(false)
 	{
-		if(!libssh2_loaded) {
-			int rc = libssh2_init(0);
-		        if(rc != 0) {
-        		        fprintf(stderr, "libssh2 initialization failed (%d)\n", rc);
-                		return;
-        		}
-			fprintf(stderr, "libssh2-%s loaded\n", libssh2_version(0));
-        		libssh2_loaded = true;
-		}
-
 		sock = socket(AF_INET, SOCK_STREAM, 0);
 
 		if(connect(sock, (struct sockaddr*)this, sizeof(*this)) != 0) {
@@ -47,37 +35,59 @@ public:
 			return;
 		}
 
-		/* Create a session instance and start it up. This will trade welcome
-		 * banners, exchange keys, and setup crypto, compression, and MAC layers
-		 */
 		session = libssh2_session_init();
 		libssh2_session_set_blocking(session, 0);
 
-		printf("handler: %d\n", handler.as<bool>());
+		printf("handle: %d\n", handle.as<bool>());
+
+		printf("ondata: %d\n", handle["ondata"].as<bool>());
+#if 0
+		if(handle["onmessage"].as<bool>()) {
+			handle.call<void>("onmessage", [](emscripten::val msg) {
+
+			});
+		}
+#endif
 	}
-	void setKey(std::string key) { keyContent = key; }
-	std::string getKey() const { return keyContent; }
-
-	void setUsername(std::string name) { username = name; }
-
-	std::string getUsername() const { return username;}
-
-	void setPassword(std::string passwd) { password = passwd; }
-
-	std::string getPassword() const { return password; }
-
-	int getSocket() const { return sock; }
-
-	static std::string getStringFromInstance(const SESSION& instance) {
-		return instance.key;
+	void setKey(std::string key) 
+	{
+		keyContent = key; 
 	}
 
-	int handshake(emscripten::val cb);
-	int _handshake();
+	std::string getKey() const 
+	{
+		return keyContent; 
+	}
+
+	void setUsername(std::string name) 
+	{
+		username = name;
+	}
+
+	std::string getUsername() const 
+	{
+		return username;
+	}
+
+	void setPassword(std::string passwd)
+	{
+		password = passwd;
+	}
+
+	std::string getPassword() const 
+	{
+		return password;
+	}
+
+	int getSocket() const {
+		return sock;
+	}
+
 	int login(emscripten::val cb);
 	int login1(emscripten::val cb);
 
-	void pushdata(std::string data) {
+	void pushdata(std::string data)
+	{
 		uint8_t *p = (uint8_t*)data.c_str();
 		printf("from raw: %lu\n", data.length());
 
@@ -111,7 +121,10 @@ public:
 		}
 	}
 
-	emscripten::val getSendCallback() const { return sendcb; }
+	emscripten::val getSendCallback() const 
+	{
+		return sendcb;
+	}
 	int setSendCallback(emscripten::val cb) {
 		sendcb = cb;
 		return 0;
@@ -123,52 +136,37 @@ private:
 		int auth_pw = 0;
 		int rc = libssh2_session_handshake(session, sock);
 
-		if(rc) {
-			if(rc != LIBSSH2_ERROR_EAGAIN) {
-				int err = libssh2_session_last_errno(session);
-				fprintf(stderr, "open session failed: (%d) %d\n", err, rc);
-			}
+		if(rc == LIBSSH2_ERROR_EAGAIN) {
+			;
+		}
+		else if(rc) {
+			int err = libssh2_session_last_errno(session);
+			fprintf(stderr, "open session failed: (%d) %d\n", err, rc);
 		}
 		else {
 			fprintf(stderr, "handshake done\n");
-			const char *fingerprint;
-			fingerprint = libssh2_hostkey_hash(this->session, LIBSSH2_HOSTKEY_HASH_SHA1);
+			const char *hostkey;
+			hostkey = libssh2_hostkey_hash(session, LIBSSH2_HOSTKEY_HASH_SHA1);
 		        fprintf(stderr, "Fingerprint: ");
 		        for(int i = 0; i < 20; i++) {
-		                fprintf(stderr, "%02X ", (unsigned char)fingerprint[i]);
+		                fprintf(stderr, "%02X ", (unsigned char)hostkey[i]);
 		        }
 		        fprintf(stderr, "\n");
 
 			startup = true;
-			memcpy(finger, fingerprint, 20);
+			memcpy(fingerprint, hostkey, 20);
 		}
 
 		return 0;
 	}
 
 public:
-	emscripten::val cb = emscripten::val::null();
-	emscripten::val handler = emscripten::val::null();
-
-	LIBSSH2_SESSION *session;
-	int sock;
-
-	bool has_shell;
-	
-	int newchannel() {
-		channel = libssh2_channel_open_session(session);
-		if(!channel) {
-			fprintf(stderr, "Unable to open a session\n");
-		}
-		else {
-			fprintf(stderr, "channel ok\n");
-		}
-		return 0;
-	}
+	CHANNEL newchannel();
+	SFTP sftp();
 
 	int request_pty() 
 	{
-		int rc = libssh2_channel_request_pty(channel, "vanilla");
+		int rc = libssh2_channel_request_pty(channel, "xterm");
 		if(rc == LIBSSH2_ERROR_EAGAIN) {
 
 		}
@@ -222,9 +220,15 @@ public:
 private:
 	std::string key;
 
+	bool has_shell;
+
+        LIBSSH2_SESSION *session;
+        int sock;
+
+
 	std::queue<uint8_t> incoming;
 	bool startup;
-	char finger[32];
+	char fingerprint[32];
 
 	std::string keyContent;
 	std::string username;
@@ -232,5 +236,11 @@ private:
 
 	emscripten::val sendcb = emscripten::val::null();
 
+        //emscripten::val cb = emscripten::val::null();
+        emscripten::val handle = emscripten::val::null();
+
 	LIBSSH2_CHANNEL *channel;
 };
+
+#endif /* ~_SSH2_SESSION_H_ */
+

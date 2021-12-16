@@ -1,17 +1,10 @@
 #include <emscripten.h>
 #include <emscripten/bind.h>
-#include <emscripten/threading.h>
 
 #include <stdio.h>
 #include <errno.h>
 
 #include <sys/socket.h>
-#include <sys/select.h>
-#include <poll.h>
-
-#include <thread>
-
-#include <queue>
 
 #include "ssh2-session.h"
 
