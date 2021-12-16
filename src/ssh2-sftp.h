@@ -18,67 +18,29 @@ public:
 		sftp = libssh2_sftp_init(session);
 	}
 
-	SFTP(LIBSSH2_SESSION *sess) :
-		session(sess)
+	SFTP(LIBSSH2_SESSION *sess, LIBSSH2_SFTP *sf) :
+		session(sess),
+		sftp(sf)
 	{
+		if(sftp) {
+			fprintf(stderr, "SFTP ok\n");
+		}
 	}
-
-	int close()
-	{
-		return libssh2_sftp_close(handle);
-	}
-
-	int closedir()
-	{
-		return libssh2_sftp_closedir(handle);
-	}
-
-	LIBSSH2_SFTP_ATTRIBUTES fsetstat()
+#if 0
+	emscripten::val lstat(std::string path) 
 	{
 		LIBSSH2_SFTP_ATTRIBUTES attrs;
-		memset(&attrs, '\0', sizeof(attrs));
+		emscripten::val v = emscripten::val::object();
 
-		if(libssh2_sftp_fsetstat(handle, &attrs)) {
-		}
-		return attrs;
-	}
-
-	LIBSSH2_SFTP_ATTRIBUTES fstat(int setstat = 0)
-	{
-		LIBSSH2_SFTP_ATTRIBUTES attrs;
-		memset(&attrs, '\0', sizeof(attrs));
-
-		if(libssh2_sftp_fstat_ex(handle, &attrs, setstat)) {
-		}
-		return attrs;
-	}
-
-	LIBSSH2_SFTP_STATVFS fstatvfs() 
-	{
-		LIBSSH2_SFTP_STATVFS st;
-		memset(&st, '\0', sizeof(st));
-
-		if(libssh2_sftp_fstatvfs(handle,  &st)) {
+                memset(&attrs, '\0', sizeof(attrs));
+		if(libssh2_sftp_lstat(sftp, path.c_str(), &attrs)) {
+			return attrs_object(v, &attrs);
 		}
 
-		return st;
-	}
+		return v;
 
-	int fsync()
-	{
-		return libssh2_sftp_fsync(handle);
 	}
-
-	int init() 
-	{
-		sftp = libssh2_sftp_init(session);
-		return 0;
-	}
-
-	int last_error()
-	{
-		return libssh2_sftp_last_error(sftp);
-	}
+#endif
 
 	LIBSSH2_SFTP_ATTRIBUTES lstat(std::string path)
 	{
@@ -89,7 +51,7 @@ public:
 		}
 		return attrs;
 	}
-
+	
 	int mkdir(std::string path, long mode) 
 	{
 		return libssh2_sftp_mkdir_ex(sftp,
@@ -111,22 +73,6 @@ public:
 		return (handle) ? 0 : -1;
 	}
 
-	int read() 
-	{
-		return libssh2_sftp_read(handle, NULL, 0);
-	}
-
-	int readdir() 
-	{
-		return libssh2_sftp_readdir(handle, NULL, 0, NULL);
-	}
-
-	int readdir_ex() 
-	{
-		return libssh2_sftp_readdir_ex(handle, NULL, 0, 
-				NULL, 0, NULL);
-	}
-
 	int readlink(std::string path, std::string target) {
 		return libssh2_sftp_readlink(sftp, 
 				path.c_str(), NULL, 0);
@@ -144,26 +90,10 @@ public:
 				flags);
 	}
 
-	int rewind() {
-		libssh2_sftp_rewind(handle);
-		return 0;
-	}
 
 	int rmdir(std::string path)
 	{
 		return libssh2_sftp_rmdir_ex(sftp, path.c_str(), path.length());
-	}
-
-	int seek(size_t offset) 
-	{
-		libssh2_sftp_seek(handle, offset);
-		return 0;
-	}
-
-	int seek64(libssh2_uint64_t offset)
-	{
-		libssh2_sftp_seek64(handle, offset);
-		return 0;
 	}
 
 	int setstat(std::string path)
@@ -176,17 +106,19 @@ public:
 		return libssh2_sftp_shutdown(sftp);
 	}
 
-	LIBSSH2_SFTP_ATTRIBUTES stat(std::string path, 
+	emscripten::val stat(std::string path, 
 			int type = LIBSSH2_SFTP_STAT)
 	{
 		LIBSSH2_SFTP_ATTRIBUTES attrs;
 		memset(&attrs, '\0', sizeof(attrs));
+		emscripten::val v = emscripten::val::object();
 
 		if(libssh2_sftp_stat_ex(sftp,
 				path.c_str(), 
 				path.length(), type, &attrs)) {
+			return attrs_object(v, &attrs);
 		}
-		return attrs;
+		return v;
 	}
 
 	LIBSSH2_SFTP_STATVFS statvfs(std::string path)
@@ -215,27 +147,13 @@ public:
 
 	}
 
-	int tell() {
-		return libssh2_sftp_tell(handle);
-	}
-
-	int tell64() {
-		return libssh2_sftp_tell64(handle);
-	}
-
 	int unlink(std::string fil)
 	{
 		return libssh2_sftp_unlink_ex(sftp, fil.c_str(), fil.length());
 	}
 
-	int write(std::string buff)
-	{
-		return libssh2_sftp_write(handle, buff.c_str(), buff.length());
-	}
-
-#if 0
 private:
-	emscripten::val & attrs_object(emscripten::val &v, 
+	emscripten::val attrs_object(emscripten::val &v, 
 			const LIBSSH2_SFTP_ATTRIBUTES *attrs)
 	{
 		v.set("flags", attrs->flags);
@@ -248,23 +166,6 @@ private:
 
 		return v;
 	}
-	emscripten::val & statvfs_object(emscripten::val &v,
-			const LIBSSH2_SFTP_STATVFS *st) {
-		v.set("bsize", st->f_bsize);
-		v.set("frsize", st->f_frsize);
-		v.set("blocks", st->f_blocks);
-		v.set("bfree", st->f_bfree);
-		v.set("bavail", st->f_bavail);
-		v.set("files", st->f_files);
-		v.set("ffree", st->f_ffree);
-		v.set("favail", st->f_favail);
-		v.set("fsid", st->f_fsid);
-		v.set("flag", st->f_flag);
-		v.set("namemax", st->f_namemax);
-
-		return v;
-	}
-#endif
 private:
 	LIBSSH2_SFTP 	    *sftp;
 	LIBSSH2_SFTP_HANDLE *handle;

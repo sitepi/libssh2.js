@@ -4,61 +4,76 @@
 
 #include "ssh2-session.h"
 
-CHANNEL SESSION::newchannel()
+CHANNEL SESSION::channel()
 {
-	channel = libssh2_channel_open_session(session);
+	LIBSSH2_CHANNEL *channel = libssh2_channel_open_session(session);
 	if(!channel) {
-		fprintf(stderr, "Unable to open a session\n");
+		int err = libssh2_session_last_errno(session);
+		if(err == LIBSSH2_ERROR_EAGAIN) {
+			;
+		}
+		else {
+			fprintf(stderr, "Unable to open a session\n");
+		}
 	}
 	else {
 		fprintf(stderr, "channel ok\n");
 	}
-	CHANNEL ch(session, channel);
-	return ch;
+
+	return CHANNEL(session, channel);
 }
 
 SFTP SESSION::sftp()
 {
-	SFTP sftp(session);
-	return sftp;
+	LIBSSH2_SFTP *sf = libssh2_sftp_init(session);
+	if(!sf) {
+		int err = libssh2_session_last_errno(session);
+		if(err == LIBSSH2_ERROR_EAGAIN) {
+			fprintf(stderr, "sftp failed eagain\n");;
+		}
+		else {
+			fprintf(stderr, "Unable to init SFTP: (%d)\n", err);
+		}
+	}
+	else {
+		fprintf(stderr, "sftp init done\n");
+	}
+
+	return SFTP(session, sf);
 }
 
-int SESSION::login1(emscripten::val cb) 
+int SESSION::userauth() 
 {
 	/* At this point we havn't authenticated. The first thing to do is check
 	 * the hostkey's fingerprint against our known hosts Your app may have it
 	 * hard coded, may go to a file, may present it to the user, that's your
 	 * call
 	 */
-	int auth_pw = 0;
 	char *userauthlist;
 
 	/* check what authentication methods are available */
 	userauthlist = libssh2_userauth_list(session, username.c_str(), username.length());
 	fprintf(stderr, "Authentication methods: %s\n", userauthlist);
-	if(strstr(userauthlist, "password") != NULL) {
-		auth_pw |= 1;
-	}
-	if(strstr(userauthlist, "keyboard-interactive") != NULL) {
-		auth_pw |= 2;
-	}
-	if(strstr(userauthlist, "publickey") != NULL) {
-		auth_pw |= 4;
-	}
 	return 0;
 }
 
-int SESSION::login(emscripten::val cb)
+int SESSION::login()
 {
-//	if(auth_pw & 1) {
-		/* We could authenticate via password */
-		if(libssh2_userauth_password(session, username.c_str(), password.c_str())) {
-			fprintf(stderr, "\tAuthentication by password failed!\n");
+	/* We could authenticate via password */
+	if(libssh2_userauth_password(session, 
+				username.c_str(), 
+				password.c_str())) {
+		int err = libssh2_session_last_errno(session);
+		if(err == LIBSSH2_ERROR_EAGAIN) {
+			;
 		}
 		else {
-			fprintf(stderr, "\tAuthentication by password succeeded.\n");
+			fprintf(stderr, "\tAuthentication by password failed!\n");
 		}
-//	}
+	}
+	else {
+		fprintf(stderr, "\tAuthentication by password succeeded.\n");
+	}
 	return 0;
 }
 

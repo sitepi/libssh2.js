@@ -25,8 +25,7 @@ class SESSION {
 public:
 	SESSION(emscripten::val handle) :
 		handle(handle),
-		startup(false),
-		has_shell(false)
+		startup(false)
 	{
 		sock = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -82,9 +81,6 @@ public:
 	int getSocket() const {
 		return sock;
 	}
-
-	int login(emscripten::val cb);
-	int login1(emscripten::val cb);
 
 	void pushdata(std::string data)
 	{
@@ -161,70 +157,15 @@ private:
 	}
 
 public:
-	CHANNEL newchannel();
+	CHANNEL channel();
 	SFTP sftp();
 
-	int request_pty() 
-	{
-		int rc = libssh2_channel_request_pty(channel, "xterm");
-		if(rc == LIBSSH2_ERROR_EAGAIN) {
-
-		}
-		else if (rc) {
-			int err = libssh2_session_last_errno(session);
-			printf("request pty failed: %d %d\n", rc, err);
-		}
-		else {
-			fprintf(stderr, "request pty ok\n");
-		}
-		return 0;
-	}
-
-	int open_shell() 
-	{
-		int rc = libssh2_channel_shell(channel);
-		if(rc == LIBSSH2_ERROR_EAGAIN) {
-
-		}
-		else if (rc) {
-			int err = libssh2_session_last_errno(session);
-			printf("request pty failed: %d %d\n", rc, err);
-		}
-		else {
-			fprintf(stderr, "open shell done\n");
-		}
-
-		has_shell = true;
-		return rc;
-	}
-
-	int channel_write(std::string cmd) {
-		int len = libssh2_channel_write(channel, cmd.c_str(), cmd.length());
-		return 0;
-	}
-
-	std::string channel_read() {
-		char buf[1024];
-		int len = libssh2_channel_read(channel, buf, 1024);
-
-		if(len) {
-			std::string data(buf, len);
-			return data;
-		}
-		else {
-			std::string data(buf, 1);
-			return data;
-		}
-	}
+	int login();
+	int userauth();
 
 private:
-	std::string key;
-
-	bool has_shell;
-
-        LIBSSH2_SESSION *session;
-        int sock;
-
+	LIBSSH2_SESSION *session;
+	int sock;
 
 	std::queue<uint8_t> incoming;
 	bool startup;
@@ -236,10 +177,8 @@ private:
 
 	emscripten::val sendcb = emscripten::val::null();
 
-        //emscripten::val cb = emscripten::val::null();
-        emscripten::val handle = emscripten::val::null();
-
-	LIBSSH2_CHANNEL *channel;
+	//emscripten::val cb = emscripten::val::null();
+	emscripten::val handle = emscripten::val::null();
 };
 
 #endif /* ~_SSH2_SESSION_H_ */

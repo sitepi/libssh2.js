@@ -5,6 +5,7 @@
 #include "ssh2-session.h"
 #include "ssh2-channel.h"
 #include "ssh2-sftp.h"
+#include "ssh2-sftp-handle.h"
 
 static bool ssh2_loaded = false;
 static int ssh2_init(int flags)
@@ -37,9 +38,7 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 
   emscripten::class_<CHANNEL>("CHANNEL")
     .constructor<emscripten::val>()
-    //.property("exit_singal", &CHANNEL::get_exit_signal)
-    //.property("exit_status", &CHANNEL::get_exit_status)
-
+    
     .function("close", &CHANNEL::close)
     .function("eof", &CHANNEL::eof)
     .function("exec", &CHANNEL::exec)
@@ -77,67 +76,57 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
     .field("namemax", &LIBSSH2_SFTP_STATVFS::f_namemax)
   ;
 
+  emscripten::class_<SFTP_HANDLE>("SFTP_HANDLE")
+    .constructor<emscripten::val>()
+    .function("close", &SFTP_HANDLE::close)
+    .function("closedir", &SFTP_HANDLE::closedir)
+    .function("fsetstat", &SFTP_HANDLE::fsetstat)
+    .function("fstat", &SFTP_HANDLE::fstat)
+    .function("fstatvfs", &SFTP_HANDLE::fstatvfs)
+    .function("fsync", &SFTP_HANDLE::fsync)
+    .function("read", &SFTP_HANDLE::read)
+    .function("readdir", &SFTP_HANDLE::readdir)
+    .function("readdir_ex", &SFTP_HANDLE::readdir_ex)
+    .function("rewind", &SFTP_HANDLE::rewind)
+    .function("seek", &SFTP_HANDLE::seek)
+    .function("seek64", &SFTP_HANDLE::seek64)
+    .function("tell", &SFTP_HANDLE::tell)
+    .function("tell64", &SFTP_HANDLE::tell64)
+    .function("write", &SFTP_HANDLE::write)
+    ;
+
   emscripten::class_<SFTP>("SFTP")
     .constructor<emscripten::val>()
 
-    .function("close", &SFTP::close)
-//    .function("close_handle", &SFTP::close_handle)
-    .function("closedir", &SFTP::closedir)
-    .function("fsetstat", &SFTP::fsetstat)
-    .function("fstat", &SFTP::fstat)
-//    .function("fstat_ex", &SFTP::fstat_ex)
-    .function("fstatvfs", &SFTP::fstatvfs)
-    .function("fsync", &SFTP::fsync)
-//    .function("get_channel", &SFTP::get_channel)
-    .function("init", &SFTP::init)
-    .function("last_error", &SFTP::last_error)
     .function("lstat", &SFTP::lstat)
     .function("mkdir", &SFTP::mkdir)
-//    .function("mkdir_ex", &SFTP::mkdir_ex)
     .function("open", &SFTP::open)
-//    .function("open_ex", &SFTP::open_ex)
     .function("opendir", &SFTP::opendir)
-    .function("read", &SFTP::read)
-    .function("readdir", &SFTP::readdir)
-    .function("readdir_ex", &SFTP::readdir_ex)
     .function("readlink", &SFTP::readlink)
     .function("realpath", &SFTP::realpath)
     .function("rename", &SFTP::rename)
-//    .function("rename_ex", &SFTP::rename_ex)
-    .function("rewind", &SFTP::rewind)
     .function("rmdir", &SFTP::rmdir)
-//    .function("rmdir_ex", &SFTP::rmdir_ex)
-    .function("seek", &SFTP::seek)
-    .function("seek64", &SFTP::seek64)
     .function("setstat", &SFTP::setstat)
     .function("shutdown", &SFTP::shutdown)
     .function("stat", &SFTP::stat)
-//    .function("stat_ex", &SFTP::stat_ex)
     .function("statvfs", &SFTP::statvfs)
     .function("symlink", &SFTP::symlink)
-//    .function("symlink_ex", &SFTP::symlink_ex)
-    .function("tell", &SFTP::tell)
-    .function("tell64", &SFTP::tell64)
     .function("unlink", &SFTP::unlink)
-//    .function("unlink_ex", &SFTP::unlink_ex)
-    .function("write", &SFTP::write)
-  ;
+    ;
 
   emscripten::class_<SESSION>("SESSION")
     .constructor<emscripten::val>()
+    
     .property("socket", &SESSION::getSocket)
     .property("key", &SESSION::getKey, &SESSION::setKey)
     .property("username", &SESSION::getUsername, &SESSION::setUsername)
     .property("password", &SESSION::getPassword, &SESSION::setPassword)
-    .property("send", &SESSION::getSendCallback,&SESSION::setSendCallback)
+    .property("send", &SESSION::getSendCallback, &SESSION::setSendCallback)
+    
     .function("pushdata", &SESSION::pushdata)
+    .function("userauth", &SESSION::userauth)
     .function("login", &SESSION::login)
-    .function("login1", &SESSION::login1)
-    .function("channel", &SESSION::newchannel)
-    .function("sftp", &SESSION::sftp)
-    .function("pty", &SESSION::request_pty)
-    .function("shell", &SESSION::open_shell)
-    .function("ch_write", &SESSION::channel_write)
-    .function("ch_read", &SESSION::channel_read)
+    .function("CHANNEL", &SESSION::channel)
+    .function("SFTP", &SESSION::sftp)
     ;
 }

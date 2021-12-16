@@ -28,8 +28,11 @@ public:
 		session(sess),
 		channel(ch)
 	{
-
+		if(channel) {
+			fprintf(stderr, "CHANNEL ok\n");
+		}
 	}
+#if 0
 	int get_exit_signal() {
 		return libssh2_channel_get_exit_signal(channel, NULL, NULL, NULL, NULL, NULL, NULL);
 	}
@@ -37,7 +40,7 @@ public:
 	int get_exit_status() {
 		return libssh2_channel_get_exit_status(channel);
 	}
-
+#endif
     	int close() {
 		return libssh2_channel_close(channel);
 	}
@@ -69,16 +72,27 @@ public:
                 }
         }
 
-	int read_stderr()
+	std::string read_stderr()
 	{
-		return libssh2_channel_read_stderr(channel, NULL, 0);
+		char buf[1024];
+		int len = libssh2_channel_read_stderr(channel, buf, 1024);
+
+		if(len) {
+			std::string data(buf, len);
+			return data;
+		}
+		else {
+			std::string data(buf, 1);
+			return data;
+		}
+
 	}
 
 	int request_pty() 
 	{
 		int rc = libssh2_channel_request_pty(channel, "xterm");
 		if(rc == LIBSSH2_ERROR_EAGAIN) {
-
+			;
 		}
 		else if (rc) {
 			int err = libssh2_session_last_errno(session);
@@ -100,14 +114,14 @@ public:
 	{
 		int rc = libssh2_channel_shell(channel);
 		if(rc == LIBSSH2_ERROR_EAGAIN) {
-
+			;
 		}
 		else if (rc) {
 			int err = libssh2_session_last_errno(session);
-			printf("request pty failed: %d %d\n", rc, err);
+			printf("get shell failed: %d %d\n", rc, err);
 		}
 		else {
-			fprintf(stderr, "open shell done\n");
+			fprintf(stderr, "shell done\n");
 		}
 		return rc;
 	}
