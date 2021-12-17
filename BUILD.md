@@ -1,5 +1,5 @@
 # libssh2.js
-LibSSH2 over Stream(WebSocket | WebRTC | Socket) on browser | nodejs
+libssh2 over STREAMs on browser | nodejs
 
 ## downloads
 * zlib (https://www.zlib.net/zlib-1.2.11.tar.gz)
@@ -7,16 +7,15 @@ LibSSH2 over Stream(WebSocket | WebRTC | Socket) on browser | nodejs
 * libssh2 (https://www.libssh2.org/download/libssh2-1.10.0.tar.gz)
 
 ## build libs
-
-	cd builds 
+	cd libssh2.js/deps
+	export EMPORTS=`pwd` 
+	mkdir builds && cd builds
 	unzip mbedtls-v2.27.0.zip 
 	tar -zxf zlib-1.2.11.tar.gz 
 	tar -zxf libssh2-1.10.0.tar.gz 
 	
-	export EMPORTS=`pwd`/ports 
-
 ### zlib
-	cd zlib-1.2.11 
+	cd zlib-1.2.11
 	emconfigure ./configure --static --prefix=${EMPORTS}
 	emmake make -j4 
 	emmake make install
@@ -63,17 +62,7 @@ LibSSH2 over Stream(WebSocket | WebRTC | Socket) on browser | nodejs
 	emmake make install 
 	cd ../../
 
-## libssh2.js build
-	cd dist
-	emcmake cmake -DCMAKE_BUILD_TYPE=Release ..
-	emmake make
+### clean
+	rm -rf deps/builds
 
-## test
-	node ../tests/test.js
-
-	or
-	
-	websockify 8100 127.0.0.1:22 & 
-	python3 -m http.server
-	visit http://host:8000/tests/test.html 
-
+all libs has installed in deps
