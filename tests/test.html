@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -27,11 +26,11 @@ function test()
 		console.log('WebSocket opened');
 	}
 
-	ws.onerror = function() {
-		console.log('WebSocket error');
+	ws.onerror = function(e) {
+		console.error('WebSocket error', e);
 	}
 	ws.onclose = function() {
-		console.error('WebSocket disconnected');
+		console.error('WebSocket closed');
 
 		delete client;
 	}
