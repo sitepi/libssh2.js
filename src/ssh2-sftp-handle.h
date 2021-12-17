@@ -8,14 +8,17 @@
 #include <libssh2.h>
 #include <libssh2_sftp.h>
 
-#include <emscripten.h>
 #include <emscripten/bind.h>
+
+#ifndef BUFF_LEN
+#define BUFF_LEN 4096
+#endif
 
 class SFTP_HANDLE {
 public:
 	SFTP_HANDLE(emscripten::val handle)
 	{
-		sftp = libssh2_sftp_init(session);
+		fprintf(stderr, "SFTP_HANDLE CANNOT CREATE DIRECTLY!\n");
 	}
 
 	SFTP_HANDLE(LIBSSH2_SFTP *sf, LIBSSH2_SFTP_HANDLE *hand) :
@@ -24,23 +27,37 @@ public:
 	{
 		if(handle) {
 			fprintf(stderr, "SFTP_HANDLE ok\n");
+			active = true;
 		}
 	}
 
 	int close()
 	{
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return -1;
+		}
+
 		return libssh2_sftp_close(handle);
 	}
 
 	int closedir()
 	{
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return -1;
+		}
+
 		return libssh2_sftp_closedir(handle);
 	}
 
 	LIBSSH2_SFTP_ATTRIBUTES fsetstat()
 	{
-		LIBSSH2_SFTP_ATTRIBUTES attrs;
 		memset(&attrs, '\0', sizeof(attrs));
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return attrs;
+		}
 
 		if(libssh2_sftp_fsetstat(handle, &attrs)) {
 		}
@@ -49,20 +66,29 @@ public:
 
 	LIBSSH2_SFTP_ATTRIBUTES fstat(int setstat = 0)
 	{
-		LIBSSH2_SFTP_ATTRIBUTES attrs;
 		memset(&attrs, '\0', sizeof(attrs));
 
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return attrs;
+		}
+
 		if(libssh2_sftp_fstat_ex(handle, &attrs, setstat)) {
+			//TODO: 
 		}
 		return attrs;
 	}
 
 	LIBSSH2_SFTP_STATVFS fstatvfs() 
 	{
-		LIBSSH2_SFTP_STATVFS st;
 		memset(&st, '\0', sizeof(st));
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return st;
+		}
 
 		if(libssh2_sftp_fstatvfs(handle,  &st)) {
+			//TODO: 
 		}
 
 		return st;
@@ -70,75 +96,117 @@ public:
 
 	int fsync()
 	{
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return -1;
+		}
+
 		return libssh2_sftp_fsync(handle);
 	}
 
-	int read() 
+	std::string read() 
 	{
-		return libssh2_sftp_read(handle, NULL, 0);
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return nodata;
+		}
+
+		ssize_t n = libssh2_sftp_read(handle, buffer, BUFF_LEN);
+		return (n) ? std::string(buffer, n) : nodata;
 	}
 
-	int readdir() 
+	std::string readdir() 
 	{
-		return libssh2_sftp_readdir(handle, NULL, 0, NULL);
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return nodata;
+		}
+
+		int n = libssh2_sftp_readdir(handle, buffer, BUFF_LEN, &attrs);
+		return (n) ? std::string(buffer, n) : nodata;
 	}
 
 	int readdir_ex() 
 	{
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return -1;
+		}
+
 		return libssh2_sftp_readdir_ex(handle, NULL, 0, 
 				NULL, 0, NULL);
 	}
 
-	int readlink(std::string path, std::string target) {
-		return libssh2_sftp_readlink(sftp, 
-				path.c_str(), NULL, 0);
-	}
-	int realpath() {
-		return libssh2_sftp_realpath(sftp, NULL, NULL, 0);
-	}
+	int rewind() 
+	{
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return -1;
+		}
 
-	int rewind() {
 		libssh2_sftp_rewind(handle);
 		return 0;
 	}
 
 	int seek(size_t offset) 
 	{
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return -1;
+		}
+
 		libssh2_sftp_seek(handle, offset);
 		return 0;
 	}
 
 	int seek64(libssh2_uint64_t offset)
 	{
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return -1;
+		}
+
 		libssh2_sftp_seek64(handle, offset);
 		return 0;
 	}
 
-	int setstat(std::string path)
-	{
-		return libssh2_sftp_setstat(sftp, path.c_str(), NULL);
-	}
-
 	int shutdown()
 	{
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return -1;
+		}
+
 		return libssh2_sftp_shutdown(sftp);
 	}
 
-	int tell() {
+	int tell()
+	{
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return -1;
+		}
+
 		return libssh2_sftp_tell(handle);
 	}
 
-	int tell64() {
-		return libssh2_sftp_tell64(handle);
-	}
-
-	int unlink(std::string fil)
+	int tell64()
 	{
-		return libssh2_sftp_unlink_ex(sftp, fil.c_str(), fil.length());
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return -1;
+		}
+
+		return libssh2_sftp_tell64(handle);
 	}
 
 	int write(std::string buff)
 	{
+		if(!handle) {
+			fprintf(stderr, "handle error\n");
+			return -1;
+		}
+
 		return libssh2_sftp_write(handle, buff.c_str(), buff.length());
 	}
 
@@ -160,6 +228,14 @@ private:
 	LIBSSH2_SFTP_HANDLE *handle;
 	LIBSSH2_SESSION     *session;
 	LIBSSH2_SFTP        *sftp;
+
+	LIBSSH2_SFTP_ATTRIBUTES attrs;
+	LIBSSH2_SFTP_STATVFS st;
+
+	char buffer[BUFF_LEN];
+	std::string nodata;
+	
+	bool active = false;
 };
 
 #endif /* ~_SSH2_SFTP_HANDLE_H_ */
