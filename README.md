@@ -3,7 +3,8 @@ libssh2 over STREAMs on browser | nodejs
 
 
 ## build libs
-	SEE [BUILD.md](https://github.com/routerplus/libssh2.js/blob/main/BUILD.md)
+
+SEE [BUILD.md](https://github.com/routerplus/libssh2.js/blob/main/BUILD.md)
 
 ## libssh2.js build
 	cd dist
@@ -18,10 +19,15 @@ libssh2 over STREAMs on browser | nodejs
 	> require('./tests/test.js')
 	> libssh2-1.10.0 loaded
 	handshake ok
-	Fingerprint: 
+	Fingerprint: xx:xx:xx:xx:xx:xx
+	> client.user = 'xxx'
+	'xxx'
+	> client.passwd = 'xxx'
+	'xxx'
+	> client.login()
+	Authentication by password succeeded.
 
-
-	or
+or
 	
 	websockify 8100 127.0.0.1:22 & 
 	python3 -m http.server
