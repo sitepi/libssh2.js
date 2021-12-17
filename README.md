@@ -1,9 +1,9 @@
 # libssh2.js
-LibSSH2 over Stream(WebSocket | WebRTC | Socket) on browser | nodejs
+libssh2 over STREAMs on browser | nodejs
 
 
 ## build libs
-	SEE deps/BUILD.md
+	SEE [BUILD.md](https://github.com/routerplus/libssh2.js/blob/main/BUILD.md)
 
 ## libssh2.js build
 	cd dist
@@ -12,7 +12,14 @@ LibSSH2 over Stream(WebSocket | WebRTC | Socket) on browser | nodejs
 	cd ..
 
 ## test
-	node tests/test.js
+	$ node 
+	Welcome to Node.js v14.15.5.
+	Type ".help" for more information.
+	> require('./tests/test.js')
+	> libssh2-1.10.0 loaded
+	handshake ok
+	Fingerprint: 
+
 
 	or
 	
