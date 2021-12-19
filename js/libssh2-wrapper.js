@@ -215,30 +215,123 @@ const SFTP = {
 		NOT_A_DIRECTORY:          19,//UL
 		INVALID_FILENAME:         20,//UL
 		LINK_LOOP:                21,//UL
+	},
+	STATMSG: {
+/* SFTP Status Codes (returned by libssh2_sftp_last_error() ) */
+		0: 'OK', //                     0,//UL
+		1: 'EOF', //                    1,//UL
+		2: 'NO_SUCH_FILE', //           2,//UL
+		3: 'PERMISSION_DENIED', //      3,//UL
+		4: 'FAILURE', //                4,//UL
+		5: 'BAD_MESSAGE', //            5,//UL
+		6: 'NO_CONNECTION', //          6,//UL
+		7: 'CONNECTION_LOST', //        7,//UL
+		8: 'OP_UNSUPPORTED', //         8,//UL
+		9: 'INVALID_HANDLE', //         9,//UL
+		10: 'NO_SUCH_PATH', //           10,//UL
+		11: 'FILE_ALREADY_EXISTS', //    11,//UL
+		12: 'WRITE_PROTECT', //          12,//UL
+		13: 'NO_MEDIA', //               13,//UL
+		14: 'NO_SPACE_ON_FILESYSTEM', // 14,//UL
+		15: 'QUOTA_EXCEEDED', //         15,//UL
+		16: 'UNKNOWN_PRINCIPLE', //      16,//UL /* Initial mis-spelling */
+		//16: 'UNKNOWN_PRINCIPAL', //      16,//UL
+		17: 'LOCK_CONFlICT', //          17,//UL /* Initial mis-spelling */
+		17: 'LOCK_CONFLICT', //          17,//UL
+		18: 'DIR_NOT_EMPTY', //          18,//UL
+		19: 'NOT_A_DIRECTORY', //        19,//UL
+		20: 'INVALID_FILENAME', //       20,//UL
+		21: 'LINK_LOOP', //              21,//UL
 	}
 };
 
-const sftp_handle = function(handle) {
+const sftp_handle = function(_h, _is_dir) {
+	const h = _h;
+	const is_dir = _is_dir || false;
+	var attrs = {};
+	var st    = {};
+
 	const 
 	close = function(cb) {
-
+		return new Promise((resolve, reject) => {
+			const rc = (is_dir) ? h.closedir() : h.close();
+			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
+				if(typeof(cb) !== 'undefined') {
+					cb(rc, ERRMSG[rc]);
+				}
+				resolve(rc);
+			}
+			else {
+				setTimeout(()=> {
+					close(cb);
+				},100);
+			}
+		});
 	},
-
+	/*
 	closedir = function(cb) {
-
-	},
+		return close(cb);
+	},*/
 	fsetstat = function(cb) {
 
 	},
-
 	fstat = function(cb) {
-
+		return new Promise((resolve, reject) => {
+			const _attrs = h.fstat(0);
+			console.log('attrs', _attrs)
+			if(_attrs.length > 0) {
+				console.log(rc, ERRMSG[rc]);
+				if(typeof(cb) !== 'undefined') {
+					cb(rc, ERRMSG[rc]);
+				}
+				resolve(rc);
+			}
+			else {
+				/*
+				setTimeout(()=> {
+					fstat(cb);
+				},100);
+				*/
+			}
+		});
 	},
 	fstatvfs = function(cb) {
-
+		return new Promise((resolve, reject) => {
+			const _st = h.fstat(0);
+			console.log('st', _st)
+			if(_st.length > 0) {
+				console.log(rc, ERRMSG[rc]);
+				if(typeof(cb) !== 'undefined') {
+					cb(rc, ERRMSG[rc]);
+				}
+				resolve(rc);
+			}
+			else {
+				/*
+				setTimeout(()=> {
+					fstat(cb);
+				},100);
+				*/
+			}
+		});
 	},
 	fsync = function(cb) {
-
+		return new Promise((resolve, reject) => {
+			const rc = h.fsync();
+			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
+				if(typeof(cb) !== 'undefined') {
+					cb(rc, ERRMSG[rc]);
+				}
+				resolve(rc);
+			}
+			else {
+				setTimeout(()=> {
+					fsync(cb);
+				},100);
+			}
+		});
 	},
 	read = function(cb) {
 
@@ -247,37 +340,131 @@ const sftp_handle = function(handle) {
 
 	},
 	rewind = function(cb) {
-
+		return new Promise((resolve, reject) => {
+			const rc = h.rewind();
+			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
+				if(typeof(cb) !== 'undefined') {
+					cb(rc, ERRMSG[rc]);
+				}
+				resolve(rc);
+			}
+			else {
+				setTimeout(()=> {
+					rewind(cb);
+				},100);
+			}
+		});
 	},
-	seek = function(offset) {
-
+	seek = function(offset, cb) {
+		return new Promise((resolve, reject) => {
+			const rc = h.seek(offset);
+			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
+				if(typeof(cb) !== 'undefined') {
+					cb(rc, ERRMSG[rc]);
+				}
+				resolve(rc);
+			}
+			else {
+				setTimeout(()=> {
+					seek(offset, cb);
+				},100);
+			}
+		});
 	},
 	seek64 = function(offset) {
-
+		return new Promise((resolve, reject) => {
+			const rc = h.seek64(offset);
+			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
+				if(typeof(cb) !== 'undefined') {
+					cb(rc, ERRMSG[rc]);
+				}
+				resolve(rc);
+			}
+			else {
+				setTimeout(()=> {
+					seek64(offset, cb);
+				},100);
+			}
+		});
 	},
 	shutdown = function(cb) {
-
+		return new Promise((resolve, reject) => {
+			const rc = h.shutdown();
+			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
+				if(typeof(cb) !== 'undefined') {
+					cb(rc, ERRMSG[rc]);
+				}
+				resolve(rc);
+			}
+			else {
+				setTimeout(()=> {
+					shutdown(cb);
+				},100);
+			}
+		});
 	},
 	tell = function(cb) {
-
+		return new Promise((resolve, reject) => {
+			const rc = h.tell();
+			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
+				if(typeof(cb) !== 'undefined') {
+					cb(rc, ERRMSG[rc]);
+				}
+				resolve(rc);
+			}
+			else {
+				setTimeout(()=> {
+					tell(cb);
+				},100);
+			}
+		});
 	},
 	tell64 = function(cb) {
-
+		return new Promise((resolve, reject) => {
+			const rc = h.tell64();
+			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
+				if(typeof(cb) !== 'undefined') {
+					cb(rc, ERRMSG[rc]);
+				}
+				resolve(rc);
+			}
+			else {
+				setTimeout(()=> {
+					tell64(cb);
+				},100);
+			}
+		});
 	},
 	write = function(buffer, cb) {
-
+		return new Promise((resolve, reject) => {
+			const n = h.write(buffer);
+			const rc = 0;
+			console.log(rc, ERRMSG[rc]);
+			if(typeof(cb) !== 'undefined') {
+				cb(rc, ERRMSG[rc]);
+			}
+			resolve(rc);
+		});
 	}
 	;
 
-	return {
+	return (is_dir) ?
+	{
 		close,
-		closedir,
+		readdir,
+	} : {
+		close,
 		fsetstat,
 		fstat,
 		fstatvfs,
 		fsync,
 		read,
-		readdir,
 		rewind,
 		seek,
 		seek64,
@@ -288,25 +475,18 @@ const sftp_handle = function(handle) {
 	};
 };
 
-const sfp = (sf) => {
-	const 
+const sftp = (_sf) => {
+	const sf = _sf;
 	lstat = (path, cb) => {
 		return new Promise((resolve, reject) => {
 			const attrs = sf.lstat(path);
 			const rc    = sf.last_error;
-			if(rc == 0) {
-				resolve(rc);
+			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
 				if(typeof(cb) !== 'undefined') {
 					cb(rc);
 				}
-			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, attrs);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, attrs);
-				}
-				console.log(ERRMSG[rc]);
+				resolve(rc);
 			}
 			else {
 				setTimeout(()=> {
@@ -318,70 +498,71 @@ const sfp = (sf) => {
 				
 	mkdir = (path, mode, cb) => {
 		return new Promise((resolve, reject) => {
-			const rc  = sf.mkdir(path, mode);
-			if(rc == 0) {
-				resolve(rc);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
-			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, ERRMSG[rc]);
+			const rc = sf.mkdir(path, mode);
+			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
 				if(typeof(cb) !== 'undefined') {
 					cb(rc, ERRMSG[rc]);
 				}
-				console.log(ERRMSG[rc]);
+				resolve(rc);
 			}
 			else {
 				setTimeout(()=> {
-					mkdir(path, cb);
-				},1000);
+					mkdir(path, mode, cb);
+				},100);
 			}
 		});
 	},
 
 	open = (path, flags, mode, type, cb) => {
+		var h;
 		return new Promise((resolve, reject) => {
-			const rc  = sf.open(path, flags, mode, type);
-			if(rc == 0) {
-				resolve(rc);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
+
+			if(typeof(h) === 'undefined') {
+				h = sf.open(path, flags, mode, type);
 			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, ERRMSG[rc]);
+			else if(!h.active) {
+				h = sf.open(path, flags, mode, type);
+			}
+			
+			if(h.active) {
+				const rc = 0;
 				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
+					cb(rc, sftp_handle(h));
+					resolve(rc);
 				}
-				console.log(ERRMSG[rc]);
+				else {
+					resolve(rc, sftp_handle(h));
+				}
 			}
 			else {
 				setTimeout(()=> {
 					open(path, flags, mode, type, cb);
-				},1000);
+				},100);
 			}
 		});
 	},
 
 	opendir = (path, cb) => {
+		var h;
 		return new Promise((resolve, reject) => {
-			const rc  = sf.opendir(path);
-			if(rc == 0) {
-				resolve(rc);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
+
+			if(typeof(h) === 'undefined') {
+				h = sf.opendir(path);
 			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, ERRMSG[rc]);
+			else if(!h.active) {
+				h = sf.opendir(path);
+			}
+
+			if(h.active) {
+				const rc = 0;
 				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
+					cb(rc, sftp_handle(h, true));
+					resolve(rc);
 				}
-				console.log(ERRMSG[rc]);
+				else {
+					resolve(rc, sftp_handle(h, true));
+				}
 			}
 			else {
 				setTimeout(()=> {
@@ -394,24 +575,17 @@ const sfp = (sf) => {
 	readlink = (path, cb) => {
 		return new Promise((resolve, reject) => {
 			const rc  = sf.readlink(path);
-			if(rc == 0) {
-				resolve(rc);
+			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
 				if(typeof(cb) !== 'undefined') {
 					cb(rc);
 				}
-			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				console.log(ERRMSG[rc]);
+				resolve(rc);
 			}
 			else {
 				setTimeout(()=> {
 					readlink(path, cb);
-				},1000);
+				},100);
 			}
 		});
 	},
@@ -419,24 +593,17 @@ const sfp = (sf) => {
 	unlink = (path, cb) => {
 		return new Promise((resolve, reject) => {
 			const rc  = sf.readlink(path);
-			if(rc == 0) {
-				resolve(rc);
+			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
 				if(typeof(cb) !== 'undefined') {
 					cb(rc);
 				}
-			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				console.log(ERRMSG[rc]);
+				resolve(rc);
 			}
 			else {
 				setTimeout(()=> {
 					readlink(path, cb);
-				},1000);
+				},100);
 			}
 		});
 	},
@@ -444,24 +611,17 @@ const sfp = (sf) => {
 	realpath = (path, cb) => {
 		return new Promise((resolve, reject) => {
 			const rc  = sf.readlink(path);
-			if(rc == 0) {
-				resolve(rc);
+			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
 				if(typeof(cb) !== 'undefined') {
 					cb(rc);
 				}
-			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				console.log(ERRMSG[rc]);
+				resolve(rc);
 			}
 			else {
 				setTimeout(()=> {
 					readlink(path, cb);
-				},1000);
+				},100);
 			}
 		});
 	},
@@ -469,19 +629,12 @@ const sfp = (sf) => {
 	rename = (source, dest, flags, cb) => {
 		return new Promise((resolve, reject) => {
 			const rc  = sf.readlink(path);
-			if(rc == 0) {
-				resolve(rc);
+			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
 				if(typeof(cb) !== 'undefined') {
 					cb(rc);
 				}
-			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				console.log(ERRMSG[rc]);
+				resolve(rc);
 			}
 			else {
 				setTimeout(()=> {
@@ -494,19 +647,12 @@ const sfp = (sf) => {
 	rmdir = (path, cb) => {
 		return new Promise((resolve, reject) => {
 			const rc  = sf.readlink(path);
-			if(rc == 0) {
-				resolve(rc);
+			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
 				if(typeof(cb) !== 'undefined') {
 					cb(rc);
 				}
-			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				console.log(ERRMSG[rc]);
+				resolve(rc);
 			}
 			else {
 				setTimeout(()=> {
@@ -519,19 +665,12 @@ const sfp = (sf) => {
 	setstat = (path, cb) => {
 		return new Promise((resolve, reject) => {
 			const rc  = sf.readlink(path);
-			if(rc == 0) {
-				resolve(rc);
+			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
 				if(typeof(cb) !== 'undefined') {
 					cb(rc);
 				}
-			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				console.log(ERRMSG[rc]);
+				resolve(rc);
 			}
 			else {
 				setTimeout(()=> {
@@ -544,19 +683,12 @@ const sfp = (sf) => {
 	shutdown = (cb) => {
 		return new Promise((resolve, reject) => {
 			const rc  = sf.readlink(path);
-			if(rc == 0) {
-				resolve(rc);
+			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
 				if(typeof(cb) !== 'undefined') {
 					cb(rc);
 				}
-			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				console.log(ERRMSG[rc]);
+				resolve(rc);
 			}
 			else {
 				setTimeout(()=> {
@@ -569,19 +701,12 @@ const sfp = (sf) => {
 	stat = (path, cb) => {
 		return new Promise((resolve, reject) => {
 			const rc  = sf.readlink(path);
-			if(rc == 0) {
-				resolve(rc);
+			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
 				if(typeof(cb) !== 'undefined') {
 					cb(rc);
 				}
-			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				console.log(ERRMSG[rc]);
+				resolve(rc);
 			}
 			else {
 				setTimeout(()=> {
@@ -594,19 +719,12 @@ const sfp = (sf) => {
 	statvfs = (path, cb) => {
 		return new Promise((resolve, reject) => {
 			const rc  = sf.readlink(path);
-			if(rc == 0) {
-				resolve(rc);
+			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
 				if(typeof(cb) !== 'undefined') {
 					cb(rc);
 				}
-			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				console.log(ERRMSG[rc]);
+				resolve(rc);
 			}
 			else {
 				setTimeout(()=> {
@@ -619,19 +737,12 @@ const sfp = (sf) => {
 	symlink = (orig, dest, type, cb) => {
 		return new Promise((resolve, reject) => {
 			const rc  = sf.readlink(path);
-			if(rc == 0) {
-				resolve(rc);
+			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				console.log(rc, ERRMSG[rc]);
 				if(typeof(cb) !== 'undefined') {
 					cb(rc);
 				}
-			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
-				resolve(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				console.log(ERRMSG[rc]);
+				resolve(rc);
 			}
 			else {
 				setTimeout(()=> {
@@ -739,7 +850,9 @@ const channel = (cb) => {
 };
 
 const createSESSION = (socket, cb) => {	
-	var sess = new Module.SESSION(socket);
+	var sess = new Module._SESSION(socket);
+
+	let has_logined = false;
 
 	sess.send = function(buffer) {
 		socket.write(buffer);
@@ -747,6 +860,10 @@ const createSESSION = (socket, cb) => {
 
 	if(typeof(socket.binaryType) !== 'undefined') {
 		socket.binaryType = 'arraybuffer';
+		socket.onopen = function() {
+			console.log('WebSocket opened');
+
+		}
 		socket.onerror = function(e) {
 			console.error('WebSocket error', e);
 		}
@@ -782,26 +899,22 @@ const createSESSION = (socket, cb) => {
 	login = (user, passwd, cb) => {
 		return new Promise((resolve, reject) => {
 			const rc = sess.login(user, passwd);
-			if(rc == 0) {
-				resolve(rc);
+			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
+				if(rc === ERROR.NONE) {
+					has_logined = true;
+					console.log('Authentication by password succeeded.');
+				}
+				console.log(rc, ERRMSG[rc]);
+
 				if(typeof(cb) !== 'undefined') {
 					cb(rc);
 				}
-
-				console.log('Authentication by password succeeded.');
-			}
-			else if(rc !== ERROR.EAGAIN) {
-				//reject(rc);
 				resolve(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				console.log(ERRMSG[rc]);
 			}
 			else {
 				setTimeout(()=> {
 					login(user, passwd, cb);
-				},1000);
+				}, 500);
 			}
 		});
 	},
@@ -815,12 +928,66 @@ const createSESSION = (socket, cb) => {
 		}
 	},
 	
-	createSFTP = () => {
+	createSFTP = (cb) => {
+		let sf;
+		return new Promise((resolve, reject) => {
+			if(!has_logined) {
+				return resolve(ERROR.AUTHENTICATION_FAILED)
+			}
+			else if(typeof(sf) === 'undefined') {
+				sf = sess.sftp();
+			}
+			else if(!sf.active) {
+				sf = sess.sftp();
+			}
 
+			if(sf.active) {
+				const rc = 0;
+				if(typeof(cb) !== 'undefined') {
+					cb(rc, sftp(sf))
+					resolve(rc);
+				}
+				else {
+					resolve(rc, sftp(sf));
+				}
+			}
+			else {
+				setTimeout(() => {
+					createSFTP(cb);
+				}, 100);
+			}
+		});
 	},
 	
-	createCHANNEL = () => {
-
+	createCHANNEL = (cb) => {
+		let ch;
+		return new Promise((resolve, reject) => {
+			if(!has_logined) {
+				return resolve(ERROR.AUTHENTICATION_FAILED)
+			}
+			else if(typeof(ch) === 'undefined') {
+				ch = sess.channel();
+			}
+			else if(!ch.active) {
+				ch = sess.channel();
+			}
+			
+			if(ch.active) {
+				const rc = 0;
+				if(typeof(cb) !== 'undefined') {
+					cb(rc, channel(ch))
+					resolve(rc);
+				}
+				else {
+					resolve(rc, channel(ch));
+				}
+			}
+			else {
+				setTimeout(() => {
+					createCHANNEL(cb);
+				}, 100);
+			}
+		});
 	}
 	;
 
@@ -840,4 +1007,5 @@ const createSESSION = (socket, cb) => {
 
 Module['ERROR'] = ERROR;
 Module['ERRMSG'] = ERRMSG;
+Module['SFTP'] = SFTP;
 Module['createSESSION'] = createSESSION;
