@@ -20,21 +20,19 @@ set(LIBSSH2_JS_SRC
 	${LIBSSH2_JS_SRC_DIR}/ssh2-session.cpp
 	${LIBSSH2_JS_SRC_DIR}/ssh2-channel.cpp
 	${LIBSSH2_JS_SRC_DIR}/ssh2-sftp.cpp
-	${LIBSSH2_JS_SRC_DIR}/socket-wrapper.cpp)
+	${LIBSSH2_JS_SRC_DIR}/emsocket.cpp)
 
 set(DEPS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps")
+
+set(LIBSSH2_JS_LIB  "${CMAKE_CURRENT_SOURCE_DIR}/js/libssh2-library.js")
+set(LIBSSH2_WRAPPER_JS "${CMAKE_CURRENT_SOURCE_DIR}/js/libssh2-wrapper.js")
 
 include_directories("${DEPS_DIR}/include")
 link_directories("${DEPS_DIR}/lib")
 
-set(WASM_OPTS "-s MODULARIZE --bind")
-set(DEPS_LIBS
-	ssh2
-	mbedtls
-	mbedcrypto
-	z)
+set(WASM_OPTS "-s MODULARIZE --bind --js-library ${LIBSSH2_JS_LIB} --post-js ${LIBSSH2_WRAPPER_JS}")
+set(DEPS_LIBS ssh2 mbedtls mbedcrypto z)
 
 add_executable(${LIBSSH2_JS_PROG} ${LIBSSH2_JS_SRC})
 set_target_properties(${LIBSSH2_JS_PROG} PROPERTIES LINK_FLAGS "${WASM_OPTS}")
-
 target_link_libraries(${LIBSSH2_JS_PROG} ${DEPS_LIBS})
