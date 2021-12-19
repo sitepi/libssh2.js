@@ -1,5 +1,23 @@
 /*
+ * Copyright (c) 2021 RouterPlus Networks
  *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 #include "ssh2-session.h"
@@ -7,22 +25,17 @@
 #include "ssh2-sftp.h"
 #include "ssh2-sftp-handle.h"
 
-static bool ssh2_loaded = false;
-static std::string version;
+static bool _init = false;
 
 static int ssh2_init(int flags)
 {
-	if(ssh2_loaded)
+	if(_init)
 		return 0;
 
 	int rc = libssh2_init(flags);
-	if(rc != 0) {
-		fprintf(stderr, "libssh2 initialization failed (%d)\n", rc);
-	}
-	else {
-		version = std::string(libssh2_version(0));
-		fprintf(stderr, "libssh2-%s loaded\n", version.c_str());
-		ssh2_loaded = true;
+	_init = (rc) ? false: true;
+	if(_init) {
+		fprintf(stderr, "libssh2-%s loaded\n", libssh2_version(0));
 	}
 	return rc;
 }
@@ -30,18 +43,25 @@ static int ssh2_init(int flags)
 static void ssh2_exit()
 {
 	libssh2_exit();
-	ssh2_loaded = false;
-	fprintf(stderr, "libssh2-%s exit\n", version.c_str());
-	version = "";
+	_init = false;
+	fprintf(stderr, "libssh2-%s exit\n", libssh2_version(0));
+}
+
+static std::string ssh2_version()
+{
+	return std::string(libssh2_version(0));
 }
 
 // Binding code
 EMSCRIPTEN_BINDINGS(libssh2_js) {
 	emscripten::function("init", &ssh2_init);
 	emscripten::function("exit", &ssh2_exit);
+	emscripten::function("version", &ssh2_version);
 
 	emscripten::class_<CHANNEL>("CHANNEL")
 		.constructor<emscripten::val>()
+
+		.property("active", &CHANNEL::getActive)
 
 		.function("close", &CHANNEL::close)
 		.function("eof", &CHANNEL::eof)
@@ -53,7 +73,7 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 		.function("setenv", &CHANNEL::setenv)
 		.function("shell", &CHANNEL::shell)
 		.function("write", &CHANNEL::write)
-		.function("write_stderr", &CHANNEL::write_stderr)
+		.function("write_err", &CHANNEL::write_err)
 		;
 
 	emscripten::value_object<LIBSSH2_SFTP_ATTRIBUTES>("attrs")
@@ -82,6 +102,9 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 
 	emscripten::class_<SFTP_HANDLE>("SFTP_HANDLE")
 		.constructor<emscripten::val>()
+
+		.property("active", &SFTP_HANDLE::getActive)
+
 		.function("close", &SFTP_HANDLE::close)
 		.function("closedir", &SFTP_HANDLE::closedir)
 		.function("fsetstat", &SFTP_HANDLE::fsetstat)
@@ -102,6 +125,8 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 	emscripten::class_<SFTP>("SFTP")
 		.constructor<emscripten::val>()
 
+		.property("active", &SFTP::getActive)
+
 		.function("lstat", &SFTP::lstat)
 		.function("mkdir", &SFTP::mkdir)
 		.function("open", &SFTP::open)
@@ -121,15 +146,13 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 	emscripten::class_<SESSION>("SESSION")
 		.constructor<emscripten::val>()
 
-		.property("key", &SESSION::getKey, &SESSION::setKey)
-		.property("user", &SESSION::getUser, &SESSION::setUser)
-		.property("passwd", &SESSION::getPwd, &SESSION::setPwd)
+		.property("fingerprint", &SESSION::getFingerprint)
 		.property("send", &SESSION::getSendCb, &SESSION::setSendCb)
 
 		.function("pushdata", &SESSION::pushdata)
 		.function("userauth", &SESSION::userauth)
 		.function("login", &SESSION::login)
-		.function("CHANNEL", &SESSION::channel)
-		.function("SFTP", &SESSION::sftp)
+		.function("channel", &SESSION::channel)
+		.function("sftp", &SESSION::sftp)
 		;
 }
