@@ -110,21 +110,116 @@ public:
 	}
 
 public:
-	std::string userauth(std::string user);
-	int login(std::string user, std::string passwd);
-
-	CHANNEL channel();
-	SFTP    sftp();
-
 	emscripten::val send = emscripten::val::null();
 
 	std::string getFingerprint() const { return fingerprint; }
 	emscripten::val getSendCb() const { return send; }
 	void setSendCb(emscripten::val cb)  { send = cb; }
 
-private:
-	int handshake();
+	CHANNEL channel()
+	{
+		LIBSSH2_CHANNEL *ch = NULL;
 
+		if(!has_logined) {
+			;
+		}
+		else if(has_opened) {
+			ch = libssh2_channel_open_session(session);
+			if(!ch) {
+				int err = libssh2_session_last_errno(session);
+				if(err == LIBSSH2_ERROR_EAGAIN) {
+					;
+				}
+				else {
+					fprintf(stderr, "Unable to open a session\n");
+				}
+			}
+		}
+
+		return CHANNEL(session, ch);
+	}
+
+	SFTP sftp()
+	{
+		LIBSSH2_SFTP *sf = NULL;
+
+		if(!has_logined) {
+			;
+		}
+		else if(has_opened) {
+			sf = libssh2_sftp_init(session);
+			if(!sf) {
+				int e = libssh2_session_last_errno(session);
+				if(e != LIBSSH2_ERROR_EAGAIN) {
+					error = e;
+					//fprintf(stderr, "Unable to init SFTP: (%d)\n", e);
+				}
+			}
+		}
+
+		return SFTP(session, sf);
+	}
+
+	std::string userauth(std::string user)
+	{
+		char *m;
+		std::string methods;
+		int rc = -1;
+
+		if(has_opened) {
+			/* check what authentication methods are available */
+			m = libssh2_userauth_list(session, user.c_str(), user.length());
+			if(!m) {
+				rc = libssh2_session_last_errno(session);
+				error = rc;
+			}
+			else {
+				fprintf(stderr, "Authentication methods: %s\n", m);
+				methods = m;
+				rc = 0;
+			}
+		}
+		return methods;
+	}
+
+	int login(std::string user, std::string passwd)
+	{
+		int rc = -1;
+		if(has_opened) {
+			/* We could authenticate via password */
+			rc = libssh2_userauth_password(session, user.c_str(), passwd.c_str());
+			if(!rc) {
+				has_logined = true;
+			}
+		}
+		return rc;
+	}
+
+private:
+	int handshake()
+	{
+		int rc = libssh2_session_handshake(session, fd);
+
+		if(!rc) {
+			const char *rsakey;
+			rsakey = libssh2_hostkey_hash(session, 
+						LIBSSH2_HOSTKEY_HASH_SHA1);
+			int n = 0;
+			char buff[256];
+			for(int i = 0; i < 20; i++) {
+				n += sprintf(buff + n, "%02X:", (unsigned char)rsakey[i]);
+			}
+
+			fingerprint = std::string(buff, n-1);
+			has_opened = true;
+		}
+		else if(rc != LIBSSH2_ERROR_EAGAIN) {
+			fprintf(stderr, "Failure establishing SSH session\n");
+			error = rc;
+		}
+
+		return rc;
+	}
 private:
 	int  fd;
 	int  error = 0;

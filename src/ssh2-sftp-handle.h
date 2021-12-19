@@ -232,8 +232,8 @@ public:
 	}
 
 	bool getActive() const {
-                return active;
-        }
+		return active;
+	}
 
 private:
 	emscripten::val & attrs_object(emscripten::val &v, 
