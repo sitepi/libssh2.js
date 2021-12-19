@@ -16,10 +16,7 @@ set(LIBSSH2_JS_PROG libssh2)
 
 set(LIBSSH2_JS_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(LIBSSH2_JS_SRC
-	${LIBSSH2_JS_SRC_DIR}/ssh2.cpp
-	${LIBSSH2_JS_SRC_DIR}/ssh2-session.cpp
-	${LIBSSH2_JS_SRC_DIR}/ssh2-channel.cpp
-	${LIBSSH2_JS_SRC_DIR}/ssh2-sftp.cpp
+	${LIBSSH2_JS_SRC_DIR}/ssh2-js.cpp
 	${LIBSSH2_JS_SRC_DIR}/emsocket.cpp)
 
 set(DEPS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps")
