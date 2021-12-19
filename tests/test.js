@@ -14,12 +14,11 @@ let passwd= 'xxxxxx'
 
 function test() 
 {
-	let client;
+	let session;
 	let socket = new net.Socket();
 
-	client = libssh2.createSESSION(socket, ()=> {
-		
-		client.login(user, passwd, (rc) => {
+	session = libssh2.createSESSION(socket, (rc)=> {	
+		session.login(user, passwd, (rc) => {
 			if(rc !== libssh2.ERROR.NONE) {
 				console.log(rc, libssh2.ERRMSG[rc]);
 			}
@@ -30,4 +29,13 @@ function test()
 		});
 	});
 	socket.connect(22, '127.0.0.1');
+}
+
+function sftp_test() {
+	var sf;
+	session.SFTP((rc, _sf) => {
+		console.log('rc=', rc);
+		// console.log('_sf', _sf);
+		sf = _sf;
+	})
 }

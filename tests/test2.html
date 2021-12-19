@@ -12,7 +12,7 @@ Module().then((wasm) => {
 	//connect();
 });
 
-let client;
+let session;
 let has_opened  = false;
 let has_logined = false;
 
@@ -30,6 +30,7 @@ function connect()
 {
 	if(has_opened) {
 		ws.close();
+		delete ws;
 		has_opened = false;
 		document.getElementById('login').disabled = true;
 		document.getElementById('connect').value = 'connect';
@@ -40,7 +41,7 @@ function connect()
 	const url = document.getElementById('url').value;
 	ws = new WebSocket(url);
 
-	client = libssh2.createSESSION(ws, ()=> {
+	session = libssh2.createSESSION(ws, ()=> {
 		logs('connected');
 
 		has_opened = true;
@@ -55,9 +56,9 @@ function login()
 	let user  = document.getElementById('user').value;
 	let passwd= document.getElementById('passwd').value;
 
-	logs('fingerprint: ' + client.fingerprint());
+	logs('fingerprint: ' + session.fingerprint());
 
-	client.login(user, passwd, (rc) => {
+	session.login(user, passwd, (rc) => {
 		if(rc !== libssh2.ERROR.NONE) {
 			logs(rc + ' ' + libssh2.ERRMSG[rc]);
 		}

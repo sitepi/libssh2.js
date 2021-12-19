@@ -7,14 +7,14 @@
 	let SESSION;
 	Module().then((libssh2) => {
 		console.log(libssh2);
-		SESSION = libssh2.SESSION;
+		SESSION = libssh2._SESSION;
 
 		libssh2.init(0);
 
 		test();
 	});
 
-let client;
+let session;
 function test()
 {
 	//console.log('test');
@@ -32,17 +32,17 @@ function test()
 	ws.onclose = function() {
 		console.error('WebSocket closed');
 
-		delete client;
+		delete session;
 	}
 	
 	ws.onmessage = function(e)  {
 		//console.log('got', e.data);
-		client.pushdata(e.data);
+		session.pushdata(e.data);
 	}
 
-	client = new SESSION(ws);
+	session = new SESSION(ws);
 
-	client.send = function(buffer, length) {
+	session.send = function(buffer, length) {
 		//console.log('to raw', length, buffer.length);
 		ws.send(buffer);
 	}
