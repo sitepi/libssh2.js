@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<script src="../dist/libssh2.js"></script>
+<script>
+let libssh2;
+
+Module().then((wasm) => {
+	libssh2 = wasm;
+	libssh2.init(0);
+	//connect();
+});
+
+let client;
+let has_opened  = false;
+let has_logined = false;
+
+function logs(msg) {
+	let log = document.getElementById('log');
+	log.innerText += (new Date()) + ' ' + msg + '\n';
+}
+
+function clean_logs() {
+	document.getElementById('log').innerText = '';
+}
+
+let ws;
+function connect()
+{
+	if(has_opened) {
+		ws.close();
+		has_opened = false;
+		document.getElementById('login').disabled = true;
+		document.getElementById('connect').value = 'connect';
+		logs('disconnected');
+		return;
+	}
+
+	const url = document.getElementById('url').value;
+	ws = new WebSocket(url);
+
+	client = libssh2.createSESSION(ws, ()=> {
+		logs('connected');
+
+		has_opened = true;
+		document.getElementById('login').disabled = false;
+		document.getElementById('connect').value = 'disconnect';
+		//login();
+	});
+}
+
+function login()
+{
+	let user  = document.getElementById('user').value;
+	let passwd= document.getElementById('passwd').value;
+
+	logs('fingerprint: ' + client.fingerprint());
+
+	client.login(user, passwd, (rc) => {
+		if(rc !== libssh2.ERROR.NONE) {
+			logs(rc + ' ' + libssh2.ERRMSG[rc]);
+		}
+		else {
+			has_logined = true;
+			logs(user + ' logined');
+		}
+	});
+}
+
+</script>
+</head>
+<body>
+url: 
+<input type='text' id='url' style='width: 600px' value='ws://127.0.0.1:7681/xxx' />
+<input type='button' onclick='connect()' id='connect' value='connect'/>
+<br/>
+user: <input type='text' id='user' value='pi'>
+passwd: <input type='text' id='passwd' value='raspberry'>
+<input type='button' onclick='login()' disabled id='login' value='login' />
+<br/>
+<hr/>
+<input type='button' onclick='clean_logs()' value='clean logs' />
+<div id='log'></div>
+</body>
+</html>
