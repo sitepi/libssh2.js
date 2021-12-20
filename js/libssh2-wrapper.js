@@ -20,6 +20,10 @@
  * SOFTWARE.
  */
 
+const nocb = (rc, msg) => {
+	console.log(rc, msg);
+}
+
 const ERROR = {
 	NONE:         0,
 	SOCKET_NONE: -1,
@@ -126,6 +130,13 @@ ERRMSG = {
 	'-47': 'CHANNEL_WINDOW_FULL',//:    -47,
 	'-48': 'KEYFILE_AUTH_FAILED',//:    -48,
 	'-49': 'RANDGEN',//:                -49
+};
+
+const CHANNEL = {
+	UNKNOWN: 0,
+	SHELL: 	 1,
+	TCPIP:   2,
+	X11:     3
 };
 
 const SFTP = {
@@ -245,216 +256,293 @@ const SFTP = {
 	}
 };
 
-const sftp_handle = function(_h, _is_dir) {
+const sftp_handle = function(_h, _isdir) {
 	const h = _h;
-	const is_dir = _is_dir || false;
+	const isdir = _isdir || false;
 	var attrs = {};
 	var st    = {};
 
 	const 
-	close = function(cb) {
-		return new Promise((resolve, reject) => {
-			const rc = (is_dir) ? h.closedir() : h.close();
-			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				resolve(rc);
+	close = function(_cb) {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
+			const rc = (isdir) ? h.closedir() : h.close();
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					close(cb);
-				},100);
+				setTimeout(()=> { _async() },100)
 			}
-		});
-	},
-	/*
-	closedir = function(cb) {
-		return close(cb);
-	},*/
-	fsetstat = function(cb) {
+		}
 
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
-	fstat = function(cb) {
-		return new Promise((resolve, reject) => {
+	fsetstat = function(_cb) {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
+			const rc = 0;
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },100)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+	fstat = function(_cb) {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const _attrs = h.fstat(0);
 			console.log('attrs', _attrs)
 			if(_attrs.length > 0) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				resolve(rc);
+				res(rc, ERRMSG[rc]);
 			}
 			else {
-				/*
-				setTimeout(()=> {
-					fstat(cb);
-				},100);
-				*/
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
-	fstatvfs = function(cb) {
-		return new Promise((resolve, reject) => {
+	fstatvfs = function(_cb) {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const _st = h.fstat(0);
-			console.log('st', _st)
 			if(_st.length > 0) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				resolve(rc);
+				cb(rc, ERRMSG[rc]);
 			}
 			else {
-				/*
-				setTimeout(()=> {
-					fstat(cb);
-				},100);
-				*/
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
-	fsync = function(cb) {
-		return new Promise((resolve, reject) => {
+	fsync = function(_cb) {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc = h.fsync();
-			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					fsync(cb);
-				},100);
+				setTimeout(()=> { _async() },100)
 			}
-		});
-	},
-	read = function(cb) {
+		}
 
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
-	readdir = function(cb) {
+	read = function(_cb) {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
 
+		const _async = () => {
+			const rc = 0;
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },100)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
-	rewind = function(cb) {
-		return new Promise((resolve, reject) => {
+	readdir = function(_cb) {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
+			const rc = 0;
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },100)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+	rewind = function(_cb) {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc = h.rewind();
-			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					rewind(cb);
-				},100);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
-	seek = function(offset, cb) {
-		return new Promise((resolve, reject) => {
+	seek = function(offset, _cb) {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc = h.seek(offset);
-			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					seek(offset, cb);
-				},100);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
-	seek64 = function(offset) {
-		return new Promise((resolve, reject) => {
+	seek64 = function(offset, _cb) {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc = h.seek64(offset);
-			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					seek64(offset, cb);
-				},100);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
-	shutdown = function(cb) {
-		return new Promise((resolve, reject) => {
+	shutdown = function(_cb) {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc = h.shutdown();
-			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					shutdown(cb);
-				},100);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
-	tell = function(cb) {
-		return new Promise((resolve, reject) => {
+	tell = function(_cb) {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc = h.tell();
-			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					tell(cb);
-				},100);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
-	tell64 = function(cb) {
-		return new Promise((resolve, reject) => {
+	tell64 = function(_cb) {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc = h.tell64();
-			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					tell64(cb);
-				},100);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
-	write = function(buffer, cb) {
+	write = function(buffer, _cb) {
+		const cb = (typeof(_cb) === 'function') ? _cb : nocb;
 		return new Promise((resolve, reject) => {
 			const n = h.write(buffer);
 			const rc = 0;
-			console.log(rc, ERRMSG[rc]);
-			if(typeof(cb) !== 'undefined') {
-				cb(rc, ERRMSG[rc]);
-			}
+			cb(rc, ERRMSG[rc]);
 			resolve(rc);
 		});
 	}
 	;
 
-	return (is_dir) ?
+	return (isdir) ?
 	{
 		close,
 		readdir,
@@ -477,45 +565,54 @@ const sftp_handle = function(_h, _is_dir) {
 
 const sftp = (_sf) => {
 	const sf = _sf;
-	lstat = (path, cb) => {
-		return new Promise((resolve, reject) => {
+	lstat = (path, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const attrs = sf.lstat(path);
 			const rc    = sf.last_error;
-			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					lstat(path, cb);
-				},1000);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
 				
-	mkdir = (path, mode, cb) => {
-		return new Promise((resolve, reject) => {
+	mkdir = (path, mode, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc = sf.mkdir(path, mode);
-			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, ERRMSG[rc]);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					mkdir(path, mode, cb);
-				},100);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
 
-	open = (path, flags, mode, type, cb) => {
+	open = (path, flags, mode, type, _cb) => {
 		var h;
+		const cb = (typeof(_cb) === 'function') ? _cb : nocb;
 		return new Promise((resolve, reject) => {
 
 			if(typeof(h) === 'undefined') {
@@ -527,13 +624,8 @@ const sftp = (_sf) => {
 			
 			if(h.active) {
 				const rc = 0;
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, sftp_handle(h));
-					resolve(rc);
-				}
-				else {
-					resolve(rc, sftp_handle(h));
-				}
+				cb(rc, sftp_handle(h));
+				resolve(rc, sftp_handle(h));
 			}
 			else {
 				setTimeout(()=> {
@@ -543,8 +635,9 @@ const sftp = (_sf) => {
 		});
 	},
 
-	opendir = (path, cb) => {
+	opendir = (path, _cb) => {
 		var h;
+		const cb = (typeof(_cb) === 'function') ? _cb : nocb;
 		return new Promise((resolve, reject) => {
 
 			if(typeof(h) === 'undefined') {
@@ -556,200 +649,235 @@ const sftp = (_sf) => {
 
 			if(h.active) {
 				const rc = 0;
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, sftp_handle(h, true));
-					resolve(rc);
-				}
-				else {
-					resolve(rc, sftp_handle(h, true));
-				}
+				cb(rc, sftp_handle(h, true));
+				resolve(rc, sftp_handle(h, true));
 			}
 			else {
 				setTimeout(()=> {
 					opendir(path, cb);
-				},1000);
-			}
-		});
-	},
-
-	readlink = (path, cb) => {
-		return new Promise((resolve, reject) => {
-			const rc  = sf.readlink(path);
-			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
-				resolve(rc);
-			}
-			else {
-				setTimeout(()=> {
-					readlink(path, cb);
 				},100);
 			}
 		});
 	},
 
-	unlink = (path, cb) => {
-		return new Promise((resolve, reject) => {
+	readlink = (path, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc  = sf.readlink(path);
-			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					readlink(path, cb);
-				},100);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
 
-	realpath = (path, cb) => {
-		return new Promise((resolve, reject) => {
+	unlink = (path, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc  = sf.readlink(path);
-			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					readlink(path, cb);
-				},100);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
 
-	rename = (source, dest, flags, cb) => {
-		return new Promise((resolve, reject) => {
+	realpath = (path, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc  = sf.readlink(path);
-			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					readlink(path, cb);
-				},1000);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
 
-	rmdir = (path, cb) => {
-		return new Promise((resolve, reject) => {
+	rename = (source, dest, flags, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc  = sf.readlink(path);
-			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					readlink(path, cb);
-				},1000);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
 
-	setstat = (path, cb) => {
-		return new Promise((resolve, reject) => {
+	rmdir = (path, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc  = sf.readlink(path);
-			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					readlink(path, cb);
-				},1000);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
 
-	shutdown = (cb) => {
-		return new Promise((resolve, reject) => {
+	setstat = (path, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc  = sf.readlink(path);
-			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					readlink(path, cb);
-				},1000);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
 
-	stat = (path, cb) => {
-		return new Promise((resolve, reject) => {
+	shutdown = (_cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc  = sf.readlink(path);
-			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					readlink(path, cb);
-				},1000);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
 
-	statvfs = (path, cb) => {
-		return new Promise((resolve, reject) => {
+	stat = (path, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc  = sf.readlink(path);
-			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					readlink(path, cb);
-				},1000);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
 
-	symlink = (orig, dest, type, cb) => {
-		return new Promise((resolve, reject) => {
+	statvfs = (path, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
 			const rc  = sf.readlink(path);
-			if((rc == ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				console.log(rc, ERRMSG[rc]);
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
-				resolve(rc);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					readlink(path, cb);
-				},1000);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+
+	symlink = (orig, dest, type, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
+			const rc  = sf.symlink(orig, dest, type);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },100)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	};
 
 	return {
@@ -770,99 +898,317 @@ const sftp = (_sf) => {
 	};
 };
 
-const channel = (cb) => {
-	let ch;
-	let has_pty, has_shell;
+const channel = (_ch) => {
+	let ch   = _ch || {active: false};
+	let type = CHANNEL.UNKNOWN;
 
-	const obj = {
-		close: () => {
-			ch.close();
-		},
-		eof: () => {
-			ch.eof();
-		},
-		exec: (cmd)=> {
-			ch.exec(cmd);
-		},
-		flush: ()=> {
-		
-		},
-		read: () => {
+	const oncb = (err, msg)=> {
+		console.log('default callback')
+		console.log(err, msg);
+	}
+	var onmessage = oncb, onerror = oncb, onclose = oncb;
+	
+	const
+	close = (_cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
 
-		},
-		read_err: () => {
-
-		},
-		write: (msg) => {
-
-		},
-		write_err: () => {
-
-		},
-		onmessage: () => {
-				
+		const _async = () => {
+			const rc  = ch.close();
+			if(rc == ERROR.NONE) {
+				ch.active = false;
+				onclose();
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },100)
+			}
 		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+	eof = (_cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
+			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				onerror(RC, ERRmsg[rc]);
+				return rej(rc, ERRMSG[rc]);
+			}
+			const rc  = ch.eof();
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },100)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+	exec = (cmd, _cb)=> {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
+			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+			const rc  = ch.exec(cmd);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },100)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+	flush = (_cb)=> {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
+			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+			const rc  = ch.flush();
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },100)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+	read = (_cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
+			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+			const rc  = ch.read();
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },100)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+	read_err = (_cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
+			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+			const rc  = ch.read_err();
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },100)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+	write = (msg, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
+			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+			const rc  = ch.write(msg);
+			if(rc == msg.length()) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },100)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+	write_err = (msg, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		const _async = () => {
+			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+			const rc  = ch.write_err(msg);
+			if(rc == ERROR.NONE) {
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },100)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+	loop = () => {
+		if(!ch.active) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			onerror(rc, ERRMSG[rc]);
+			return rej(rc, ERRMSG[rc]);
+		}
+
+		if(type === CHANNEL.UNKNOWN) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			onerror(rc, ERRMSG[rc]);
+			return;
+		}
+		
+		const msg = ch.read();
+		if(msg.length > 0) {
+			onmessage(msg);
+		}
+
+		setTimeout(loop, 50);
+	}
+	;
+
+	const shell = (_cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
+		let has_pty = false, has_shell = false;
+
+		const _async = () => {
+			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+
+			var rc = ERROR.NONE;
+			if(!has_pty) {
+				rc = ch.pty();
+				has_pty = (rc === ERROR.NONE) ? true: false;
+			}
+
+			if(has_pty && !has_shell) {
+				rc = ch.shell();
+				has_shell = (rc === ERROR.NONE) ? true: false;
+			}
+			
+			if((rc !== ERROR.NONE) && (rc !== ERROR.EAGAIN)) {
+				return rej(rc, ERRMSG[rc])
+			}
+
+			if(has_pty && has_shell) {
+				loop();
+				res(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },200)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+	tcpip = () => {
+
+	},
+	x11 = () => {
+
 	};
 
-	return new Promise((resolve, reject) => {
-		if(ch.active) {
-			if(!has_pty) {
-				const rc = ch.pty();
-				if(rc === 0) {
-					has_pty = true;
-				}
-				else if(rc !== ERROR.EAGAIN) {
-					setTimeout(()=> {
-						SHELL(cb);
-					},100);
-				}
-				else {
-					//reject();
-					resolve(rc);
-				}
-			}
+	/*
+	const request_pty = () => {
 
-			if(!has_shell) {
-				const rc = ch.shell();
-				if(rc === 0) {
-					has_shell = true;
-				}
-				else if(rc !== ERROR.EAGAIN) {
-					setTimeout(()=> {
-						SHELL(cb);
-					},100);
-				}
-				else {
-					//reject();
-					resolve(rc);
-				}
-			}
+	}*/
 
-			resolve(rc);
-		}
-		else {
-			ch = sess.CHANNEL();
-			setTimeout(()=> {
-				SHELL(user, passwd, cb);
-			},100);
-		}
-	});
+	return {
+		close,
+		//eof,
+		exec,
+		flush,
+		//read,
+		//read_err,
+		send: write,
+		write,
+		//write_err,
+		shell,
+		tcpip,
+		x11,
+		type: () => {return type;}
+	};
 };
 
-const createSESSION = (socket, cb) => {	
+const createSESSION = (socket, _cb) => {
+	const cb = (typeof(_cb) === 'function') ? _cb : nocb;
 	var sess = new Module._SESSION(socket);
 
 	let has_logined = false;
-
-	sess.send = function(buffer) {
-		socket.write(buffer);
-	}
 
 	if(typeof(socket.binaryType) !== 'undefined') {
 		socket.binaryType = 'arraybuffer';
 		socket.onopen = function() {
 			console.log('WebSocket opened');
-
 		}
 		socket.onerror = function(e) {
 			console.error('WebSocket error', e);
@@ -896,27 +1242,27 @@ const createSESSION = (socket, cb) => {
 	}
 
 	const
-	login = (user, passwd, cb) => {
-		return new Promise((resolve, reject) => {
-			const rc = sess.login(user, passwd);
-			if((rc === ERROR.NONE) || (rc !== ERROR.EAGAIN)) {
-				if(rc === ERROR.NONE) {
-					has_logined = true;
-					console.log('Authentication by password succeeded.');
-				}
-				console.log(rc, ERRMSG[rc]);
+	login = (user, passwd, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
 
-				if(typeof(cb) !== 'undefined') {
-					cb(rc);
-				}
-				resolve(rc, ERRMSG[rc]);
+		const _async = () => {
+			const rc = sess.login(user, passwd);
+			if(rc == ERROR.NONE) {
+				has_logined = true;
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
-				setTimeout(()=> {
-					login(user, passwd, cb);
-				}, 500);
+				setTimeout(()=> { _async() },200)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
 
 	close = () => {
@@ -928,11 +1274,15 @@ const createSESSION = (socket, cb) => {
 		}
 	},
 	
-	createSFTP = (cb) => {
+	createSFTP = (_cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
 		let sf;
-		return new Promise((resolve, reject) => {
+		const _async = () => {
 			if(!has_logined) {
-				return resolve(ERROR.AUTHENTICATION_FAILED)
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
 			}
 			else if(typeof(sf) === 'undefined') {
 				sf = sess.sftp();
@@ -943,27 +1293,29 @@ const createSESSION = (socket, cb) => {
 
 			if(sf.active) {
 				const rc = 0;
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, sftp(sf))
-					resolve(rc);
-				}
-				else {
-					resolve(rc, sftp(sf));
-				}
+				res(rc, sftp(sf));
 			}
 			else {
 				setTimeout(() => {
-					createSFTP(cb);
+					_async();
 				}, 100);
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
 	
-	createCHANNEL = (cb) => {
+	createCHANNEL = (_cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb, rej = _cb;
+
 		let ch;
-		return new Promise((resolve, reject) => {
+		const _async = () => {
 			if(!has_logined) {
-				return resolve(ERROR.AUTHENTICATION_FAILED)
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
 			}
 			else if(typeof(ch) === 'undefined') {
 				ch = sess.channel();
@@ -974,20 +1326,18 @@ const createSESSION = (socket, cb) => {
 			
 			if(ch.active) {
 				const rc = 0;
-				if(typeof(cb) !== 'undefined') {
-					cb(rc, channel(ch))
-					resolve(rc);
-				}
-				else {
-					resolve(rc, channel(ch));
-				}
+				res(rc, channel(ch));
 			}
 			else {
 				setTimeout(() => {
-					createCHANNEL(cb);
+					_async();
 				}, 100);
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	}
 	;
 
@@ -1008,4 +1358,5 @@ const createSESSION = (socket, cb) => {
 Module['ERROR'] = ERROR;
 Module['ERRMSG'] = ERRMSG;
 Module['SFTP'] = SFTP;
+Module['CHANNEL'] = CHANNEL;
 Module['createSESSION'] = createSESSION;
