@@ -1,1 +1,166 @@
+<!doctype html>
+<html>
+  <head>
+    <title>xterm.js & libssh2.js demo</title>
+    <!--
+      WARNING: This demo is a barebones implementation designed for development and evaluation
+      purposes only. It is definitely NOT production ready and does not aim to be so. Exposing the
+      demo to the public as is would introduce security risks for the host.
+    -->
+    <link rel="shortcut icon" type="image/png" href="/logo.png">
+    <link rel="stylesheet" href="xterm.css">
+    <script src="../dist/libssh2.js"></script>
+    <script src="xterm.min.js"></script>
+  </head>
+  <body>
+    <h1 style="color: #2D2E2C">xterm.js & libssh2.js: A terminal for the <em style="color: #5DA5D5">web</em></h1>
 
+<input type='text' id='url' style='width: 600px' value='ws://127.0.0.1:7681/xxx' />
+    <input type='button' onclick='doconnect()' id='connect' value='connect'/>
+    <br/><br/>
+    <div id="terminal"></div>
+
+  </body>
+<script>
+var term = new Terminal();
+term.open(document.getElementById('terminal'));
+term.write('xterm.js & libssh2.js ready!\r\n');
+term.write('click button to connect\r\n');
+term.focus();
+
+let libssh2;
+Module().then((wasm) => {
+	libssh2 = wasm;
+	libssh2.init(0);
+});
+
+let has_opened = false;
+let ws;
+function doconnect()
+{
+	if(has_opened) {
+		ws.close();
+		delete ws;
+		has_opened = false;
+		document.getElementById('connect').value = 'connect';
+		term.write('\r\nstream disconnected\r\n');
+		return;
+	}
+	else {
+		const url = document.getElementById('url').value;
+		ws = new WebSocket(url);
+
+		session = libssh2.createSESSION(ws, ()=> {
+			term.write('stream connected\r\n');
+			term.focus();
+
+			has_opened = true;
+			document.getElementById('connect').value = 'disconnect';
+			
+			setTimeout(() => {
+				term.write('Fingerprint: ' +
+					session.fingerprint() + '\r\n');
+				dologin();
+			},500);
+		});
+	}
+}
+
+function dologin() {
+	term.write('login as: ');
+
+	let user = '';
+	let passwd= '';
+	let mode = 0;
+	let stop = false;
+	term.onData((c) => {
+		if(stop)
+			return;
+
+		// console.log('c=', c, c.length, c.charCodeAt(0));
+
+		if(mode === 0) {
+			if (c.charCodeAt(0) === 127) { // '\b'
+				if(user.length > 1) {
+					user = user.substring(0, user.length-1);
+					term.write('\x07');
+				}
+			}
+			else if(c.charCodeAt(0) === 13) { // '\n
+				if(user.length === 0) {
+					term.write('\r\nlogin as: ');
+				}
+				else {
+					mode++;
+					term.write('\r\n'+user+"'s password: ");
+				}
+			}
+			else {
+				user += c;
+				term.write(c);
+			}
+		}
+		else if(mode === 1) {
+			if (c.charCodeAt(0) === 127) { //	'\b'
+				if(passwd.length > 1) {
+					passwd=passwd.substring(0,passwd.length-1);
+				}
+			}
+			else if(c.charCodeAt(0) === 13) { // '\n') {
+				mode++;
+				term.write('\r\n');
+			}
+			else {
+				passwd += c;
+			}
+		}
+
+		if(mode === 2) {
+			stop = true;
+			session.login(user, passwd, (rc, msg) => {
+				console.log(rc, msg);
+				if(rc == libssh2.ERROR.NONE) {
+					doshell()
+				}
+				else {
+					term.write('Access denied\r\n');
+					stop = false;
+					mode = 1;
+					passwd = '';
+					term.write(user + "'s password: ");
+				}
+			});
+		}
+
+	});
+}
+
+function doshell() {
+
+	let ch;
+
+	session.CHANNEL((rc, _ch) => {
+		if(rc !== libssh2.ERROR.NONE) {
+			term.write('channel error\r\n');
+			return;
+		}
+
+		ch = _ch;
+		ch.onmessage((rc, msg) => {
+			term.write(msg);
+		});
+		ch.shell((rc, msg) => {
+			console.log(rc, msg);
+			if(rc !== libssh2.ERROR.NONE) {
+				term.write('got shell failed\r\n');
+				return;
+			}
+
+			term.onData((c) => {
+				ch.send(c);
+			});
+		});
+	});
+}
+</script>
+</html>
