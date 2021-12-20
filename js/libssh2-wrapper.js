@@ -140,6 +140,52 @@ const CHANNEL = {
 };
 
 const SFTP = {
+	/* Flags for open_ex() */
+	OPENFILE:           0,
+	OPENDIR:            1,
+
+	/* Flags for rename_ex() */
+	RENAME_OVERWRITE:   0x00000001,
+	RENAME_ATOMIC:      0x00000002,
+	RENAME_NATIVE:      0x00000004,
+
+	/* Flags for stat_ex() */
+	STAT:               0,
+	LSTAT:              1,
+	SETSTAT:            2,
+
+	/* Flags for symlink_ex() */
+	SYMLINK:            0,
+	READLINK:           1,
+	REALPATH:           2,
+	
+	/* Flags for sftp_mkdir() */
+	DEFAULT_MODE:      -1,
+
+	/* SFTP attribute flag bits */
+	ATTR_SIZE:              0x00000001,
+	ATTR_UIDGID:            0x00000002,
+	ATTR_PERMISSIONS:       0x00000004,
+	ATTR_ACMODTIME:         0x00000008,
+	ATTR_EXTENDED:          0x80000000,
+
+	ATTR: {
+		SIZE:              0x00000001,
+		UIDGID:            0x00000002,
+		PERMISSIONS:       0x00000004,
+		ACMODTIME:         0x00000008,
+		EXTENDED:          0x80000000
+	},
+
+	/* SFTP statvfs flag bits */
+	ST_RDONLY:              0x00000001,
+	ST_NOSUID:              0x00000002,
+
+	ST: {
+		RDONLY:              0x00000001,
+		NOSUID:              0x00000002
+	},
+
 	TYPE: {
 		/* SFTP filetypes */
 		REGULAR:           1,
@@ -160,7 +206,6 @@ const SFTP = {
 	 *
 	 * These is used in "permissions" of "struct _LIBSSH2_SFTP_ATTRIBUTES"
 	 */
-	
 		/* File type */
 		S_IFMT:         0170000,     /* type of file mask */
 		S_IFIFO:        0010000,     /* named pipe (fifo) */
@@ -265,7 +310,7 @@ const sftp_handle = function(_h, _isdir) {
 	const 
 	close = function(_cb) {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			const rc = (isdir) ? h.closedir() : h.close();
@@ -286,12 +331,13 @@ const sftp_handle = function(_h, _isdir) {
 	},
 	fsetstat = function(_cb) {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const rc = 0;
+			const msg = h.fsetstat();
+			const rc  = h.error;
 			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
+				res(rc, msg);
 			}
 			else if (rc !== ERROR.EAGAIN) {
 				rej(rc, ERRMSG[rc]);
@@ -307,13 +353,16 @@ const sftp_handle = function(_h, _isdir) {
 	},
 	fstat = function(_cb) {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const _attrs = h.fstat(0);
-			console.log('attrs', _attrs)
-			if(_attrs.length > 0) {
-				res(rc, ERRMSG[rc]);
+			const msg = h.fstat();
+			const rc  = h.error;
+			if(rc == ERROR.NONE) {
+				res(rc, msg);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
 				setTimeout(()=> { _async() },100)
@@ -326,12 +375,16 @@ const sftp_handle = function(_h, _isdir) {
 	},
 	fstatvfs = function(_cb) {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const _st = h.fstat(0);
-			if(_st.length > 0) {
-				cb(rc, ERRMSG[rc]);
+			const msg = h.fstatvfs();
+			const rc  = h.error;
+			if(rc == ERROR.NONE) {
+				res(rc, msg);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
 			}
 			else {
 				setTimeout(()=> { _async() },100)
@@ -344,7 +397,7 @@ const sftp_handle = function(_h, _isdir) {
 	},
 	fsync = function(_cb) {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			const rc = h.fsync();
@@ -365,12 +418,13 @@ const sftp_handle = function(_h, _isdir) {
 	},
 	read = function(_cb) {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const rc = 0;
+			const msg = h.read();
+			const rc  = 0;
 			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
+				res(rc, msg);
 			}
 			else if (rc !== ERROR.EAGAIN) {
 				rej(rc, ERRMSG[rc]);
@@ -386,12 +440,13 @@ const sftp_handle = function(_h, _isdir) {
 	},
 	readdir = function(_cb) {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const rc = 0;
+			const msg = h.readdir();
+			const rc  = 0;
 			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
+				res(rc, msg);
 			}
 			else if (rc !== ERROR.EAGAIN) {
 				rej(rc, ERRMSG[rc]);
@@ -407,7 +462,7 @@ const sftp_handle = function(_h, _isdir) {
 	},
 	rewind = function(_cb) {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			const rc = h.rewind();
@@ -428,7 +483,7 @@ const sftp_handle = function(_h, _isdir) {
 	},
 	seek = function(offset, _cb) {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			const rc = h.seek(offset);
@@ -449,7 +504,7 @@ const sftp_handle = function(_h, _isdir) {
 	},
 	seek64 = function(offset, _cb) {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			const rc = h.seek64(offset);
@@ -470,7 +525,7 @@ const sftp_handle = function(_h, _isdir) {
 	},
 	shutdown = function(_cb) {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			const rc = h.shutdown();
@@ -491,7 +546,7 @@ const sftp_handle = function(_h, _isdir) {
 	},
 	tell = function(_cb) {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			const rc = h.tell();
@@ -512,7 +567,7 @@ const sftp_handle = function(_h, _isdir) {
 	},
 	tell64 = function(_cb) {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			const rc = h.tell64();
@@ -564,16 +619,18 @@ const sftp_handle = function(_h, _isdir) {
 };
 
 const sftp = (_sf) => {
-	const sf = _sf;
+	const sf = _sf || { active: false };
+
+	const
 	lstat = (path, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			const attrs = sf.lstat(path);
-			const rc    = sf.last_error;
+			const rc    = sf.error;
 			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
+				res(rc, attrs);
 			}
 			else if (rc !== ERROR.EAGAIN) {
 				rej(rc, ERRMSG[rc]);
@@ -587,10 +644,9 @@ const sftp = (_sf) => {
 			res = resolve; rej = reject; _async();
 		})
 	},
-				
 	mkdir = (path, mode, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			const rc = sf.mkdir(path, mode);
@@ -609,11 +665,12 @@ const sftp = (_sf) => {
 			res = resolve; rej = reject; _async();
 		})
 	},
-
 	open = (path, flags, mode, type, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb || nocb, rej = _cb || nocb;
+		
 		var h;
-		const cb = (typeof(_cb) === 'function') ? _cb : nocb;
-		return new Promise((resolve, reject) => {
+		const _async = () => {
 
 			if(typeof(h) === 'undefined') {
 				h = sf.open(path, flags, mode, type);
@@ -622,24 +679,32 @@ const sftp = (_sf) => {
 				h = sf.open(path, flags, mode, type);
 			}
 			
+			const rc = sf.error;
+			if(rc === ERROR.NONE) {
+				;
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+
 			if(h.active) {
-				const rc = 0;
-				cb(rc, sftp_handle(h));
-				resolve(rc, sftp_handle(h));
+				res(rc, sftp_handle(h));
 			}
 			else {
-				setTimeout(()=> {
-					open(path, flags, mode, type, cb);
-				},100);
+				setTimeout(()=> { _async() },100)
 			}
-		});
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	},
-
 	opendir = (path, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb || nocb, rej = _cb || nocb;
+		
 		var h;
-		const cb = (typeof(_cb) === 'function') ? _cb : nocb;
-		return new Promise((resolve, reject) => {
-
+		const _async = () => {
 			if(typeof(h) === 'undefined') {
 				h = sf.opendir(path);
 			}
@@ -647,27 +712,35 @@ const sftp = (_sf) => {
 				h = sf.opendir(path);
 			}
 
+			const rc = sf.error;
+			if(rc === ERROR.NONE) {
+				;
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+
 			if(h.active) {
-				const rc = 0;
-				cb(rc, sftp_handle(h, true));
-				resolve(rc, sftp_handle(h, true));
+				res(rc, sftp_handle(h, true));
 			}
 			else {
-				setTimeout(()=> {
-					opendir(path, cb);
-				},100);
+				setTimeout(()=> { _async() },100)
 			}
-		});
-	},
+		}
 
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
 	readlink = (path, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const rc  = sf.readlink(path);
+			const msg = sf.readlink(path);
+			const rc  = sf.error;
 			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
+				res(rc, msg);
 			}
 			else if (rc !== ERROR.EAGAIN) {
 				rej(rc, ERRMSG[rc]);
@@ -684,10 +757,10 @@ const sftp = (_sf) => {
 
 	unlink = (path, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const rc  = sf.readlink(path);
+			const rc  = sf.unlink(path);
 			if(rc == ERROR.NONE) {
 				res(rc, ERRMSG[rc]);
 			}
@@ -703,15 +776,15 @@ const sftp = (_sf) => {
 			res = resolve; rej = reject; _async();
 		})
 	},
-
 	realpath = (path, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const rc  = sf.readlink(path);
+			const msg = sf.realpath(path);
+			const rc  = sf.error;
 			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
+				res(rc, msg);
 			}
 			else if (rc !== ERROR.EAGAIN) {
 				rej(rc, ERRMSG[rc]);
@@ -728,10 +801,10 @@ const sftp = (_sf) => {
 
 	rename = (source, dest, flags, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const rc  = sf.readlink(path);
+			const rc  = sf.rename(source, dest, flags);
 			if(rc == ERROR.NONE) {
 				res(rc, ERRMSG[rc]);
 			}
@@ -747,10 +820,9 @@ const sftp = (_sf) => {
 			res = resolve; rej = reject; _async();
 		})
 	},
-
 	rmdir = (path, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			const rc  = sf.readlink(path);
@@ -769,13 +841,12 @@ const sftp = (_sf) => {
 			res = resolve; rej = reject; _async();
 		})
 	},
-
 	setstat = (path, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const rc  = sf.readlink(path);
+			const rc  = sf.setstat(path);
 			if(rc == ERROR.NONE) {
 				res(rc, ERRMSG[rc]);
 			}
@@ -791,15 +862,15 @@ const sftp = (_sf) => {
 			res = resolve; rej = reject; _async();
 		})
 	},
-
 	shutdown = (_cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const rc  = sf.readlink(path);
+			const rc  = sf.shutdown();
 			if(rc == ERROR.NONE) {
 				res(rc, ERRMSG[rc]);
+				//TODO: set flag
 			}
 			else if (rc !== ERROR.EAGAIN) {
 				rej(rc, ERRMSG[rc]);
@@ -813,15 +884,15 @@ const sftp = (_sf) => {
 			res = resolve; rej = reject; _async();
 		})
 	},
-
 	stat = (path, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const rc  = sf.readlink(path);
+			const msg = sf.stat(path, SFTP.STAT);
+			const rc  = sf.error;
 			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
+				res(rc, msg);
 			}
 			else if (rc !== ERROR.EAGAIN) {
 				rej(rc, ERRMSG[rc]);
@@ -835,15 +906,15 @@ const sftp = (_sf) => {
 			res = resolve; rej = reject; _async();
 		})
 	},
-
 	statvfs = (path, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const rc  = sf.readlink(path);
+			const msg = sf.statvfs(path);
+			const rc  = sf.error;
 			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
+				res(rc, msg);
 			}
 			else if (rc !== ERROR.EAGAIN) {
 				rej(rc, ERRMSG[rc]);
@@ -857,15 +928,15 @@ const sftp = (_sf) => {
 			res = resolve; rej = reject; _async();
 		})
 	},
-
 	symlink = (orig, dest, type, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
-			const rc  = sf.symlink(orig, dest, type);
+			const msg = sf.symlink(orig, dest, type);
+			const rc  = sf.error;
 			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
+				res(rc, msg);
 			}
 			else if (rc !== ERROR.EAGAIN) {
 				rej(rc, ERRMSG[rc]);
@@ -898,12 +969,12 @@ const sftp = (_sf) => {
 	};
 };
 
-const channel = (_ch) => {
+const channel = (_ch, _istcp) => {
 	let ch   = _ch || {active: false};
-	let type = CHANNEL.UNKNOWN;
+	let istcp= _istcp|| false;
+	let type = (istcp) ? CHANNEL.TCPIP : CHANNEL.UNKNOWN;
 
 	const oncb = (err, msg)=> {
-		console.log('default callback')
 		console.log(err, msg);
 	}
 	var onmessage = oncb, onerror = oncb, onclose = oncb;
@@ -911,12 +982,19 @@ const channel = (_ch) => {
 	const
 	close = (_cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
+			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				onerror(RC, ERRmsg[rc]);
+				return rej(rc, ERRMSG[rc]);
+			}
 			const rc  = ch.close();
 			if(rc == ERROR.NONE) {
 				ch.active = false;
+				type = CHANNEL.UNKNOWN;
+
 				onclose();
 				res(rc, ERRMSG[rc]);
 			}
@@ -934,12 +1012,16 @@ const channel = (_ch) => {
 	},
 	eof = (_cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			if(!ch.active) {
 				const rc = ERROR.AUTHENTICATION_FAILED;
 				onerror(RC, ERRmsg[rc]);
+				return rej(rc, ERRMSG[rc]);
+			}
+			else if(type === CHANNEL.UNKNOWN) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
 				return rej(rc, ERRMSG[rc]);
 			}
 			const rc  = ch.eof();
@@ -960,10 +1042,14 @@ const channel = (_ch) => {
 	},
 	exec = (cmd, _cb)=> {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+			else if(type === CHANNEL.UNKNOWN) {
 				const rc = ERROR.AUTHENTICATION_FAILED;
 				return rej(rc, ERRMSG[rc]);
 			}
@@ -985,10 +1071,14 @@ const channel = (_ch) => {
 	},
 	flush = (_cb)=> {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+			else if(type === CHANNEL.UNKNOWN) {
 				const rc = ERROR.AUTHENTICATION_FAILED;
 				return rej(rc, ERRMSG[rc]);
 			}
@@ -1010,23 +1100,19 @@ const channel = (_ch) => {
 	},
 	read = (_cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			if(!ch.active) {
 				const rc = ERROR.AUTHENTICATION_FAILED;
 				return rej(rc, ERRMSG[rc]);
 			}
-			const rc  = ch.read();
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
+			else if(type === CHANNEL.UNKNOWN) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
 			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
+			const msg = ch.read();
+			res(0, msg);
 		}
 
 		return (iscb) ? _async() : new Promise((resolve, reject) => {
@@ -1035,23 +1121,19 @@ const channel = (_ch) => {
 	},
 	read_err = (_cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			if(!ch.active) {
 				const rc = ERROR.AUTHENTICATION_FAILED;
 				return rej(rc, ERRMSG[rc]);
 			}
-			const rc  = ch.read_err();
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
+			else if(type === CHANNEL.UNKNOWN) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
 			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
+			const msg  = ch.read_err();
+			res(0, msg);
 		}
 
 		return (iscb) ? _async() : new Promise((resolve, reject) => {
@@ -1060,15 +1142,19 @@ const channel = (_ch) => {
 	},
 	write = (msg, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			if(!ch.active) {
 				const rc = ERROR.AUTHENTICATION_FAILED;
 				return rej(rc, ERRMSG[rc]);
 			}
+			else if(type === CHANNEL.UNKNOWN) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
 			const rc  = ch.write(msg);
-			if(rc == msg.length()) {
+			if(rc === msg.length) {
 				res(rc, ERRMSG[rc]);
 			}
 			else if (rc !== ERROR.EAGAIN) {
@@ -1085,10 +1171,14 @@ const channel = (_ch) => {
 	},
 	write_err = (msg, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+			else if(type === CHANNEL.UNKNOWN) {
 				const rc = ERROR.AUTHENTICATION_FAILED;
 				return rej(rc, ERRMSG[rc]);
 			}
@@ -1108,36 +1198,39 @@ const channel = (_ch) => {
 			res = resolve; rej = reject; _async();
 		})
 	},
-	loop = () => {
+	chloop = () => {
 		if(!ch.active) {
 			const rc = ERROR.AUTHENTICATION_FAILED;
 			onerror(rc, ERRMSG[rc]);
-			return rej(rc, ERRMSG[rc]);
 		}
-
-		if(type === CHANNEL.UNKNOWN) {
+		else if(type === CHANNEL.UNKNOWN) {
 			const rc = ERROR.AUTHENTICATION_FAILED;
 			onerror(rc, ERRMSG[rc]);
-			return;
+			console.log('shell?, tcpip? x11?');
 		}
-		
-		const msg = ch.read();
-		if(msg.length > 0) {
-			onmessage(msg);
+		else {
+			const msg = ch.read();
+			if(msg.length > 0) {
+				onmessage(0, msg);
+			}
+			setTimeout(chloop, 100);
 		}
-
-		setTimeout(loop, 50);
 	}
 	;
 
 	const shell = (_cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		let has_pty = false, has_shell = false;
 
 		const _async = () => {
 			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+
+			if(type !== CHANNEL.UNKNOWN) {
 				const rc = ERROR.AUTHENTICATION_FAILED;
 				return rej(rc, ERRMSG[rc]);
 			}
@@ -1158,7 +1251,8 @@ const channel = (_ch) => {
 			}
 
 			if(has_pty && has_shell) {
-				loop();
+				type = CHANNEL.SHELL;
+				chloop();
 				res(rc, ERRMSG[rc]);
 			}
 			else {
@@ -1170,32 +1264,67 @@ const channel = (_ch) => {
 			res = resolve; rej = reject; _async();
 		})
 	},
-	tcpip = () => {
+	x11 = (screen, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb || nocb, rej = _cb || nocb;
 
-	},
-	x11 = () => {
+		let has_pty = false, has_x11 = false;
 
+		const _async = () => {
+			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+
+			if(type !== CHANNEL.UNKNOWN) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+
+			var rc = ERROR.NONE;
+			if(!has_pty) {
+				rc = ch.pty();
+				has_pty = (rc === ERROR.NONE) ? true: false;
+			}
+
+			if(has_pty && !has_x11) {
+				rc = ch.x11_req(screen);
+				has_x11 = (rc === ERROR.NONE) ? true: false;
+			}
+			
+			if((rc !== ERROR.NONE) && (rc !== ERROR.EAGAIN)) {
+				return rej(rc, ERRMSG[rc])
+			}
+
+			if(has_pty && has_shell) {
+				type = CHANNEL.X11;
+				chloop();
+				res(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },200)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
 	};
-
-	/*
-	const request_pty = () => {
-
-	}*/
 
 	return {
 		close,
 		//eof,
 		exec,
 		flush,
-		//read,
+		read,
 		//read_err,
 		send: write,
 		write,
 		//write_err,
 		shell,
-		tcpip,
 		x11,
-		type: () => {return type;}
+		type: () => {return type;},
+		onmessage: (cb) => { onmessage = cb }
 	};
 };
 
@@ -1244,7 +1373,7 @@ const createSESSION = (socket, _cb) => {
 	const
 	login = (user, passwd, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			const rc = sess.login(user, passwd);
@@ -1276,7 +1405,7 @@ const createSESSION = (socket, _cb) => {
 	
 	createSFTP = (_cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		let sf;
 		const _async = () => {
@@ -1292,13 +1421,11 @@ const createSESSION = (socket, _cb) => {
 			}
 
 			if(sf.active) {
-				const rc = 0;
+				const rc = ERROR.NONE;
 				res(rc, sftp(sf));
 			}
 			else {
-				setTimeout(() => {
-					_async();
-				}, 100);
+				setTimeout(() => { _async() }, 100);
 			}
 		}
 
@@ -1309,7 +1436,7 @@ const createSESSION = (socket, _cb) => {
 	
 	createCHANNEL = (_cb) => {
 		const iscb = (typeof(_cb) === 'function');
-		let res = _cb, rej = _cb;
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		let ch;
 		const _async = () => {
@@ -1329,9 +1456,37 @@ const createSESSION = (socket, _cb) => {
 				res(rc, channel(ch));
 			}
 			else {
-				setTimeout(() => {
-					_async();
-				}, 100);
+				setTimeout(() => { _async()}, 100);
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+	createTCPIP = (ipaddr, port, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb || nocb, rej = _cb || nocb;
+
+		let ch;
+		const _async = () => {
+			if(!has_logined) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+			else if(typeof(ch) === 'undefined') {
+				ch = sess.tcpip(ipaddr, port);
+			}
+			else if(!ch.active) {
+				ch = sess.tcpip(ipaddr, port);
+			}
+			
+			if(ch.active) {
+				const rc = 0;
+				res(rc, channel(ch, true));
+			}
+			else {
+				setTimeout(() => { _async()}, 100);
 			}
 		}
 
@@ -1342,13 +1497,12 @@ const createSESSION = (socket, _cb) => {
 	;
 
 	if(typeof(cb) !== 'undefined') {
-		setTimeout(()=> {
-			cb();
-		},50);
+		setTimeout(()=> { cb();　},50);
 	}
 	return {
-		SFTP: createSFTP,
-		SHELL: createCHANNEL,
+		'SFTP':    createSFTP,
+		'CHANNEL': createCHANNEL,
+		'TCPIP':   createTCPIP,
 		login,
 		close,
 		fingerprint: () => {return sess.fingerprint}
