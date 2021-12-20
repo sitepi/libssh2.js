@@ -74,6 +74,7 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 		.function("shell", &CHANNEL::shell)
 		.function("write", &CHANNEL::write)
 		.function("write_err", &CHANNEL::write_err)
+		.function("x11_req", &CHANNEL::x11_req)
 		;
 
 	emscripten::value_object<LIBSSH2_SFTP_ATTRIBUTES>("attrs")
@@ -104,6 +105,7 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 		.constructor<emscripten::val>()
 
 		.property("active", &SFTP_HANDLE::getActive)
+		.property("error", &SFTP_HANDLE::getError)
 
 		.function("close", &SFTP_HANDLE::close)
 		.function("closedir", &SFTP_HANDLE::closedir)
@@ -126,6 +128,7 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 		.constructor<emscripten::val>()
 
 		.property("active", &SFTP::getActive)
+		.property("error", &SFTP::getError)
 
 		.function("lstat", &SFTP::lstat)
 		.function("mkdir", &SFTP::mkdir)
@@ -148,11 +151,13 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 
 		.property("fingerprint", &SESSION::getFingerprint)
 		.property("send", &SESSION::getSendCb, &SESSION::setSendCb)
+		.property("error", &SESSION::getError)
 
 		.function("pushdata", &SESSION::pushdata)
 		.function("userauth", &SESSION::userauth)
 		.function("login", &SESSION::login)
 		.function("channel", &SESSION::channel)
 		.function("sftp", &SESSION::sftp)
+		.function("tcpip", &SESSION::tcpip)
 		;
 }

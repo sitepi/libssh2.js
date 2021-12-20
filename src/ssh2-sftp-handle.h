@@ -70,12 +70,9 @@ public:
 	LIBSSH2_SFTP_ATTRIBUTES fsetstat()
 	{
 		memset(&attrs, '\0', sizeof(attrs));
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return attrs;
-		}
-
-		if(libssh2_sftp_fsetstat(handle, &attrs)) {
+		error = LIBSSH2_ERROR_SOCKET_NONE;
+		if(active) {
+			error = libssh2_sftp_fsetstat(handle, &attrs);
 		}
 		return attrs;
 	}
@@ -83,30 +80,21 @@ public:
 	LIBSSH2_SFTP_ATTRIBUTES fstat(int setstat = 0)
 	{
 		memset(&attrs, '\0', sizeof(attrs));
+		error = LIBSSH2_ERROR_SOCKET_NONE;
 
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return attrs;
-		}
-
-		if(libssh2_sftp_fstat_ex(handle, &attrs, setstat)) {
-			//TODO: 
+		if(active) {
+			error = libssh2_sftp_fstat_ex(handle, &attrs, setstat);
 		}
 		return attrs;
 	}
 
 	LIBSSH2_SFTP_STATVFS fstatvfs() 
 	{
-		memset(&st, '\0', sizeof(st));
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return st;
+		memset(&attrs, '\0', sizeof(attrs));
+		error = LIBSSH2_ERROR_SOCKET_NONE;
+		if(active) {
+			error = libssh2_sftp_fstatvfs(handle,  &st);
 		}
-
-		if(libssh2_sftp_fstatvfs(handle,  &st)) {
-			//TODO: 
-		}
-
 		return st;
 	}
 
@@ -120,43 +108,46 @@ public:
 
 	std::string read() 
 	{
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return nodata;
+		int n = 0;
+		error = LIBSSH2_ERROR_SOCKET_NONE;
+		if(active) {
+			n = libssh2_sftp_read(handle, buffer, BUFF_LEN);
+			error = (n <0) ? n : 0;
 		}
-
-		ssize_t n = libssh2_sftp_read(handle, buffer, BUFF_LEN);
-		return (n) ? std::string(buffer, n) : nodata;
+		return (n>0) ? std::string(buffer, n) : nodata;
 	}
 
 	std::string readdir() 
 	{
+		int n = 0;
 		memset(&attrs, '\0', sizeof(attrs));
-		if(!active) {
-			fprintf(stderr, "handle error\n");
-			return nodata;
+		error = LIBSSH2_ERROR_SOCKET_NONE;
+		if(active) {
+			n = libssh2_sftp_readdir(handle, buffer, BUFF_LEN, &attrs);
+			error = (n<0) ? n : 0;
 		}
-
-		int n = libssh2_sftp_readdir(handle, buffer, BUFF_LEN, &attrs);
-		return (n) ? std::string(buffer, n) : nodata;
+		
+		return (n>0) ? std::string(buffer, n) : nodata;
 	}
 
-	int readdir_ex() 
+	std::string readdir_ex() 
 	{
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return -1;
+		int n = 0;
+		error = LIBSSH2_ERROR_SOCKET_NONE;
+		if(active) {
+			n = libssh2_sftp_readdir_ex(handle, NULL, 0, 
+					NULL, 0, NULL);
+			error = (n<0) ? n : 0;
 		}
 
-		return libssh2_sftp_readdir_ex(handle, NULL, 0, 
-				NULL, 0, NULL);
+		return (n>0) ? std::string(buffer, n) : nodata;
 	}
 
 	int rewind() 
 	{
 		if(active) {
 			libssh2_sftp_rewind(handle);
-			return 0;
+			return LIBSSH2_ERROR_NONE;
 		}
 		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
@@ -165,7 +156,7 @@ public:
 	{
 		if(active) {
 			libssh2_sftp_seek(handle, offset);
-			return 0;
+			return LIBSSH2_ERROR_NONE;
 		}
 		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
@@ -174,28 +165,24 @@ public:
 	{
 		if(active) {
 			libssh2_sftp_seek64(handle, offset);
-			return 0;
+			return LIBSSH2_ERROR_NONE;
 		}
 		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	int shutdown()
 	{
-		int rc = 0;
 		if(active) {
-			rc = libssh2_sftp_shutdown(sftp);
+			return libssh2_sftp_shutdown(sftp);
 		}
-		else {
-			rc = LIBSSH2_ERROR_SOCKET_NONE;
-		}
-		return rc;
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	int tell()
 	{
 		if(active) {
 			libssh2_sftp_tell(handle);
-			return 0;
+			return LIBSSH2_ERROR_NONE;
 		}
 		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
@@ -204,7 +191,7 @@ public:
 	{
 		if(active) {
 			libssh2_sftp_tell64(handle);
-			return 0;
+			return LIBSSH2_ERROR_NONE;
 		}
 		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
@@ -215,12 +202,15 @@ public:
 			return libssh2_sftp_write(handle, 
 					buff.c_str(), buff.length());
 		}
-
 		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	bool getActive() const {
 		return active;
+	}
+
+	int getError() const {
+		return error;
 	}
 
 private:
@@ -247,8 +237,9 @@ private:
 
 	char buffer[BUFF_LEN];
 	std::string nodata;
-	
+
 	bool active = false;
+	int error = 0;
 };
 
 #endif /* ~_SSH2_SFTP_HANDLE_H_ */

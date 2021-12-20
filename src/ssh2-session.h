@@ -121,18 +121,29 @@ public:
 		LIBSSH2_CHANNEL *ch = NULL;
 
 		if(!has_logined) {
-			;
+			error = LIBSSH2_ERROR_SOCKET_NONE;
 		}
 		else if(has_opened) {
 			ch = libssh2_channel_open_session(session);
 			if(!ch) {
-				int err = libssh2_session_last_errno(session);
-				if(err == LIBSSH2_ERROR_EAGAIN) {
-					;
-				}
-				else {
-					fprintf(stderr, "Unable to open a session\n");
-				}
+				error = libssh2_session_last_errno(session);
+			}
+		}
+
+		return CHANNEL(session, ch);
+	}
+
+	CHANNEL tcpip(std::string ipaddr, int port)
+	{
+		LIBSSH2_CHANNEL *ch = NULL;
+
+		if(!has_logined) {
+			error = LIBSSH2_ERROR_SOCKET_NONE;
+		}
+		else if(has_opened) {
+			ch = libssh2_channel_direct_tcpip(session, ipaddr.c_str(), port);
+			if(!ch) {
+				error = libssh2_session_last_errno(session);
 			}
 		}
 
@@ -144,16 +155,12 @@ public:
 		LIBSSH2_SFTP *sf = NULL;
 
 		if(!has_logined) {
-			;
+			error = LIBSSH2_ERROR_SOCKET_NONE;
 		}
 		else if(has_opened) {
 			sf = libssh2_sftp_init(session);
 			if(!sf) {
-				int e = libssh2_session_last_errno(session);
-				if(e != LIBSSH2_ERROR_EAGAIN) {
-					error = e;
-					//fprintf(stderr, "Unable to init SFTP: (%d)\n", e);
-				}
+				error = libssh2_session_last_errno(session);
 			}
 		}
 
@@ -164,27 +171,27 @@ public:
 	{
 		char *m;
 		std::string methods;
-		int rc = -1;
 
 		if(has_opened) {
 			/* check what authentication methods are available */
 			m = libssh2_userauth_list(session, user.c_str(), user.length());
 			if(!m) {
-				rc = libssh2_session_last_errno(session);
-				error = rc;
+				error = libssh2_session_last_errno(session);
 			}
 			else {
 				fprintf(stderr, "Authentication methods: %s\n", m);
 				methods = m;
-				rc = 0;
 			}
+		}
+		else {
+			error = LIBSSH2_ERROR_SOCKET_NONE;
 		}
 		return methods;
 	}
 
 	int login(std::string user, std::string passwd)
 	{
-		int rc = -1;
+		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		if(has_opened) {
 			/* We could authenticate via password */
 			rc = libssh2_userauth_password(session, user.c_str(), passwd.c_str());
@@ -193,6 +200,11 @@ public:
 			}
 		}
 		return rc;
+	}
+
+
+	int getError() const {
+		return error;
 	}
 
 private:
@@ -220,9 +232,9 @@ private:
 
 		return rc;
 	}
+
 private:
 	int  fd;
-	int  error = 0;
 	bool has_opened = false;
 	bool has_logined= false;
 
@@ -235,6 +247,8 @@ private:
 
 	emscripten::val onerror   = emscripten::val::null();
 	emscripten::val onclose   = emscripten::val::null();
+
+	int  error = 0;
 };
 
 #endif /* ~_SSH2_SESSION_H_ */

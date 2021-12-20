@@ -50,7 +50,7 @@ public:
 
 	int close() 
 	{
-		int rc = 0;
+		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		if(active) {
 			rc = libssh2_channel_close(channel);
 			if(!rc) {
@@ -58,9 +58,6 @@ public:
 				channel = NULL;
 				active = false;
 			}
-		}
-		else {
-			rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		}
 		return rc;
 	}
@@ -94,11 +91,12 @@ public:
 		int n = 0;
 		if(active) {
 			n = libssh2_channel_read(channel, buffer, BUFF_LEN);
+			error = (n < 0) ? libssh2_session_last_errno(session) : 0;
 		}
 		else {
-			// error = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+			error = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		}
-		return (n) ? std::string(buffer, n) : nodata;
+		return (n>0) ? std::string(buffer, n) : nodata;
 	}
 
 	std::string read_err()
@@ -106,29 +104,35 @@ public:
 		ssize_t n = 0;
 		if(active) {
 			n=libssh2_channel_read_stderr(channel, buffer, BUFF_LEN);
+			error = (n < 0) ? libssh2_session_last_errno(session) : 0;
 		}
-		return (n) ? std::string(buffer, n) : nodata;
+		else {
+			error = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		}
+		return (n>0) ? std::string(buffer, n) : nodata;
 	}
 
 	int pty() 
 	{
-		int rc = 0;
+		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		if(active) {
 			rc = libssh2_channel_request_pty(channel, "xterm");
-
-			if(rc == LIBSSH2_ERROR_EAGAIN) {
-					;
-			}
-			else if (rc) {
-				int err = libssh2_session_last_errno(session);
-				fprintf(stderr, "pty failed: %d %d\n", rc, err);
-			}
-			else {
+			if(!rc) {
 				fprintf(stderr, "pty ok\n");
 			}
 		}
-		else {
-			rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+
+		return rc;
+	}
+
+	int x11_req(int screen) 
+	{
+		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		if(active) {
+			rc = libssh2_channel_x11_req(channel, screen);
+			if(!rc) {
+				fprintf(stderr, "x11 ok\n");
+			}
 		}
 
 		return rc;
@@ -136,62 +140,44 @@ public:
 
 	int setenv(std::string name, std::string value)
 	{
-		int rc = 0;
 		if(active) {
-			rc = libssh2_channel_setenv(channel, 
+			return libssh2_channel_setenv(channel, 
 					name.c_str(), value.c_str());
 		}
-		else {
-			rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
-		}
-
-		return rc;
+		
+		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 	}
 
 	int shell() 
 	{
-		int rc = 0;
+		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		if(active) {
 			rc = libssh2_channel_shell(channel);
-			if (rc == LIBSSH2_ERROR_EAGAIN) {
-				;
-			}
-			else if(rc) {
-				int err = libssh2_session_last_errno(session);
-				fprintf(stderr, "shell err: %d %d\n", rc, err);
-			}
-			else {
+			if(!rc) {
 				fprintf(stderr, "shell ok\n");
 			}
 		}
-		else {
-			rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
-		}
+		
 		return rc;
 	}
 
 	int write(std::string cmd)
 	{
-		int rc = 0;
+		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		if(active) {
 			rc = libssh2_channel_write(channel, 
 					cmd.c_str(),cmd.length());
 		}
-		else {
-			rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
-		}
+
 		return rc;
 	}
 
 	int write_err(std::string cmd)
 	{
-		int rc = 0;
+		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		if(active) {
 			rc = libssh2_channel_write_stderr(channel,
 					cmd.c_str(),  cmd.length());
-		}
-		else {
-			rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		}
 		return rc;
 	}
@@ -200,14 +186,19 @@ public:
 		return active;
 	}
 
+	bool getError() const {
+		return error;
+	}
+
 private:
 	LIBSSH2_SESSION *session = NULL;
 	LIBSSH2_CHANNEL *channel = NULL;
 
-	bool active = false;
-
 	char buffer[BUFF_LEN];
 	std::string nodata;
+
+	bool active = false;
+	int error = 0;
 };
 
 #endif /* ~_SSH2_CHANNEL_H_ */
