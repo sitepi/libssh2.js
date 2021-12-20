@@ -59,37 +59,34 @@ public:
 				active = false;
 			}
 		}
+		else {
+			rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		}
 		return rc;
 	}
 
 	int eof() 
 	{
-		int rc = 0;
 		if(active) {
-			rc = libssh2_channel_eof(channel);
+			return libssh2_channel_eof(channel);
 		}
-
-		return rc;
+		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 	}
 
 	int exec(std::string cmd) 
 	{
-		int rc = 0;
 		if(active) {
-			rc = libssh2_channel_exec(channel, cmd.c_str());
+			return libssh2_channel_exec(channel, cmd.c_str());
 		}
-
-		return rc;
+		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 	}
 
 	int flush() 
 	{
-		int rc = 0;
 		if(active) {
-			rc = libssh2_channel_flush(channel);
+			return libssh2_channel_flush(channel);
 		}
-
-		return rc;
+		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 	}
 
 	std::string read()
@@ -98,7 +95,9 @@ public:
 		if(active) {
 			n = libssh2_channel_read(channel, buffer, BUFF_LEN);
 		}
-
+		else {
+			// error = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		}
 		return (n) ? std::string(buffer, n) : nodata;
 	}
 
@@ -128,6 +127,9 @@ public:
 				fprintf(stderr, "pty ok\n");
 			}
 		}
+		else {
+			rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		}
 
 		return rc;
 	}
@@ -138,6 +140,9 @@ public:
 		if(active) {
 			rc = libssh2_channel_setenv(channel, 
 					name.c_str(), value.c_str());
+		}
+		else {
+			rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		}
 
 		return rc;
@@ -159,7 +164,9 @@ public:
 				fprintf(stderr, "shell ok\n");
 			}
 		}
-
+		else {
+			rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		}
 		return rc;
 	}
 
@@ -170,7 +177,9 @@ public:
 			rc = libssh2_channel_write(channel, 
 					cmd.c_str(),cmd.length());
 		}
-
+		else {
+			rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		}
 		return rc;
 	}
 
@@ -180,6 +189,9 @@ public:
 		if(active) {
 			rc = libssh2_channel_write_stderr(channel,
 					cmd.c_str(),  cmd.length());
+		}
+		else {
+			rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		}
 		return rc;
 	}

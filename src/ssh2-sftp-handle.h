@@ -53,22 +53,18 @@ public:
 
 	int close()
 	{
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return -1;
+		if(active) {
+			return libssh2_sftp_close(handle);
 		}
-
-		return libssh2_sftp_close(handle);
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	int closedir()
 	{
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return -1;
+		if(active) {
+			return libssh2_sftp_closedir(handle);
 		}
-
-		return libssh2_sftp_closedir(handle);
+		return  LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	LIBSSH2_SFTP_ATTRIBUTES fsetstat()
@@ -116,12 +112,10 @@ public:
 
 	int fsync()
 	{
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return -1;
+		if(active) {
+			return libssh2_sftp_fsync(handle);
 		}
-
-		return libssh2_sftp_fsync(handle);
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	std::string read() 
@@ -138,7 +132,7 @@ public:
 	std::string readdir() 
 	{
 		memset(&attrs, '\0', sizeof(attrs));
-		if(!handle) {
+		if(!active) {
 			fprintf(stderr, "handle error\n");
 			return nodata;
 		}
@@ -160,75 +154,69 @@ public:
 
 	int rewind() 
 	{
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return -1;
+		if(active) {
+			libssh2_sftp_rewind(handle);
+			return 0;
 		}
-
-		libssh2_sftp_rewind(handle);
-		return 0;
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	int seek(size_t offset) 
 	{
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return -1;
+		if(active) {
+			libssh2_sftp_seek(handle, offset);
+			return 0;
 		}
-
-		libssh2_sftp_seek(handle, offset);
-		return 0;
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	int seek64(libssh2_uint64_t offset)
 	{
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return -1;
+		if(active) {
+			libssh2_sftp_seek64(handle, offset);
+			return 0;
 		}
-
-		libssh2_sftp_seek64(handle, offset);
-		return 0;
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	int shutdown()
 	{
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return -1;
+		int rc = 0;
+		if(active) {
+			rc = libssh2_sftp_shutdown(sftp);
 		}
-
-		return libssh2_sftp_shutdown(sftp);
+		else {
+			rc = LIBSSH2_ERROR_SOCKET_NONE;
+		}
+		return rc;
 	}
 
 	int tell()
 	{
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return -1;
+		if(active) {
+			libssh2_sftp_tell(handle);
+			return 0;
 		}
-
-		return libssh2_sftp_tell(handle);
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	int tell64()
 	{
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return -1;
+		if(active) {
+			libssh2_sftp_tell64(handle);
+			return 0;
 		}
-
-		return libssh2_sftp_tell64(handle);
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	int write(std::string buff)
 	{
-		if(!handle) {
-			fprintf(stderr, "handle error\n");
-			return -1;
+		if(active) {
+			return libssh2_sftp_write(handle, 
+					buff.c_str(), buff.length());
 		}
 
-		return libssh2_sftp_write(handle, buff.c_str(), buff.length());
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	bool getActive() const {

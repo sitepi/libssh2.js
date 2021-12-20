@@ -69,8 +69,7 @@ public:
 	int mkdir(std::string path, long mode) 
 	{
 		if(!sftp) {
-			fprintf(stderr, "sftp error\n");
-			return 0;
+			return LIBSSH2_ERROR_SOCKET_NONE;
 		}
 
 		return libssh2_sftp_mkdir_ex(sftp,
@@ -122,7 +121,7 @@ public:
 			return libssh2_sftp_unlink_ex(sftp,
 					path.c_str(), path.length());
 		}
-		return 32768;
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	std::string realpath(std::string path)
@@ -145,7 +144,7 @@ public:
 						dest.length(),
 						flags);
 		}
-		return 32768;
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	int rmdir(std::string path)
@@ -153,8 +152,7 @@ public:
 		if(active) {
 			return libssh2_sftp_rmdir_ex(sftp, path.c_str(), path.length());
 		}
-
-		return 32768;
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	int setstat(std::string path)
@@ -162,16 +160,15 @@ public:
 		if(active) {
 			return libssh2_sftp_setstat(sftp, path.c_str(), NULL);
 		}
-		return 32768;
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	int shutdown()
 	{
-		if(!sftp) {
+		if(active) {
 			return libssh2_sftp_shutdown(sftp);
 		}
-
-		return 32768;
+		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
 	emscripten::val stat(std::string path, 
@@ -228,8 +225,8 @@ public:
 	}
 
 	bool getActive() const {
-                return active;
-        }
+		return active;
+	}
 
 private:
 	emscripten::val attrs_object(emscripten::val &v, 
