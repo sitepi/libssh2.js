@@ -1,6 +1,7 @@
 # libssh2.js
-libssh2 over STREAMs on browser | nodejs
+libssh2 over STREAMs for browsers or nodejs
 
+STREAMs is a WebSocket, WebRTC Datachannel, or nodejs net.Socket 
 
 ## build libs
 
@@ -20,11 +21,7 @@ SEE [BUILD.md](https://github.com/routerplus/libssh2.js/blob/main/BUILD.md)
 	> libssh2-1.10.0 loaded
 	handshake ok
 	Fingerprint: xx:xx:xx:xx:xx:xx
-	> client.user = 'xxx'
-	'xxx'
-	> client.passwd = 'xxx'
-	'xxx'
-	> client.login()
+	> client.login('root', 'passwd')
 	Authentication by password succeeded.
 
 or
