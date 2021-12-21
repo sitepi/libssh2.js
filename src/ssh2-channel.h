@@ -125,6 +125,20 @@ public:
 		return rc;
 	}
 
+	int pty_size(int width, int height) 
+	{
+		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		if(active) {
+			rc = libssh2_channel_request_pty_size(channel, 
+					width, height);
+			if(!rc) {
+				fprintf(stderr, "pty size(%d, %d) ok\n", width, height);
+			}
+		}
+
+		return rc;
+	}
+
 	int x11_req(int screen) 
 	{
 		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;

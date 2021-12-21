@@ -70,6 +70,7 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 		.function("read", &CHANNEL::read)
 		.function("read_err", &CHANNEL::read_err)
 		.function("pty", &CHANNEL::pty)
+		.function("pty_size", &CHANNEL::pty_size)
 		.function("setenv", &CHANNEL::setenv)
 		.function("shell", &CHANNEL::shell)
 		.function("write", &CHANNEL::write)
