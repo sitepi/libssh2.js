@@ -10,20 +10,31 @@
     <link rel="shortcut icon" type="image/png" href="/logo.png">
     <link rel="stylesheet" href="./xterm-4.15.0/xterm.css">
     <script src="./xterm-4.15.0/xterm.min.js"></script>
+    <script src="./xterm-4.15.0/xterm-addon-fit.min.js"></script>
 
     <script src="../dist/libssh2.js"></script>
   </head>
   <body>
+    <center>
     <h1 style="color: #2D2E2C">xterm.js & libssh2.js: A terminal for the <em style="color: #5DA5D5">web</em></h1>
 
 <input type='text' id='url' style='width: 600px' value='ws://127.0.0.1:7681/xxx' />
     <input type='button' onclick='doconnect()' id='connect' value='connect'/>
     <br/><br/>
-    <div id="terminal"></div>
+    </center>
+    <div>
+	    <div style="margin:0 auto; width: 900px;text-align:right">
+		    <input type='button' onclick='term.clear()' value='clear'>
+	    </div>
 
+	    <div id="terminal" style="margin:0 auto; width: 900px; height: 600px;text-align:right"></div>
+    </div>
   </body>
 <script>
 var term = new Terminal();
+const fitAddon = new FitAddon.FitAddon();
+term.loadAddon(fitAddon);
+
 term.open(document.getElementById('terminal'));
 term.write('xterm.js & libssh2.js ready!\r\n');
 term.write('click button to connect\r\n');
@@ -68,6 +79,7 @@ function doconnect()
 }
 
 function dologin() {
+	fitAddon.fit();
 	term.write('login as: ');
 
 	let user = '';
@@ -78,13 +90,12 @@ function dologin() {
 		if(stop)
 			return;
 
-		// console.log('c=', c, c.length, c.charCodeAt(0));
-
 		if(mode === 0) {
 			if (c.charCodeAt(0) === 127) { // '\b'
-				if(user.length > 1) {
+				if(user.length >= 1) {
 					user = user.substring(0, user.length-1);
-					term.write('\x07');
+					term.write('\x1b[D');
+					term.write('\x1b[K');
 				}
 			}
 			else if(c.charCodeAt(0) === 13) { // '\n
@@ -103,9 +114,10 @@ function dologin() {
 		}
 		else if(mode === 1) {
 			if (c.charCodeAt(0) === 127) { //	'\b'
-				if(passwd.length > 1) {
+				if(passwd.length >= 1) {
 					passwd=passwd.substring(0,passwd.length-1);
-					term.write('\x07');
+					term.write('\x1b[D');
+					term.write('\x1b[K');
 				}
 			}
 			else if(c.charCodeAt(0) === 13) { // '\n') {
@@ -161,6 +173,11 @@ function doshell() {
 
 			term.onData((c) => {
 				ch.send(c);
+			});
+
+			ch.pty_size(term.cols, term.rows, (rc, msg) => {
+				console.log('pty_size', rc, msg);
+
 			});
 		});
 	});
