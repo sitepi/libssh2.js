@@ -21,7 +21,7 @@ SEE [BUILD.md](https://github.com/routerplus/libssh2.js/blob/main/BUILD.md)
 	> libssh2-1.10.0 loaded
 	handshake ok
 	Fingerprint: xx:xx:xx:xx:xx:xx
-	> client.login('root', 'passwd')
+	> session.login('root', 'passwd')
 	Authentication by password succeeded.
 
 or
