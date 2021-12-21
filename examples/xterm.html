@@ -105,6 +105,7 @@ function dologin() {
 			if (c.charCodeAt(0) === 127) { //	'\b'
 				if(passwd.length > 1) {
 					passwd=passwd.substring(0,passwd.length-1);
+					term.write('\x07');
 				}
 			}
 			else if(c.charCodeAt(0) === 13) { // '\n') {
@@ -113,6 +114,7 @@ function dologin() {
 			}
 			else {
 				passwd += c;
+				term.write('*');
 			}
 		}
 
