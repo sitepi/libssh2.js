@@ -1215,7 +1215,8 @@ const channel = (_ch, _istcp) => {
 			}
 			setTimeout(chloop, 100);
 		}
-	}
+	},
+	x11loop = chloop
 	;
 
 	const shell = (_cb) => {
@@ -1268,7 +1269,38 @@ const channel = (_ch, _istcp) => {
 		const iscb = (typeof(_cb) === 'function');
 		let res = _cb || nocb, rej = _cb || nocb;
 
-		let has_pty = false, has_x11 = false;
+		const _async = () => {
+			if(!ch.active) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+
+			// got shell first
+			if(type !== CHANNEL.SHELL) {
+				const rc = ERROR.AUTHENTICATION_FAILED;
+				return rej(rc, ERRMSG[rc]);
+			}
+
+			const rc = ch.x11_req(screen);
+			if(rc == ERROR.NONE) {
+				type = CHANNEL.X11;
+				res(rc, ERRMSG[rc]);
+			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
+			else {
+				setTimeout(()=> { _async() },100)
+			}
+		}
+
+		return (iscb) ? _async() : new Promise((resolve, reject) => {
+			res = resolve; rej = reject; _async();
+		})
+	},
+	pty_size = (width, height, _cb) => {
+		const iscb = (typeof(_cb) === 'function');
+		let res = _cb || nocb, rej = _cb || nocb;
 
 		const _async = () => {
 			if(!ch.active) {
@@ -1276,40 +1308,29 @@ const channel = (_ch, _istcp) => {
 				return rej(rc, ERRMSG[rc]);
 			}
 
-			if(type !== CHANNEL.UNKNOWN) {
+			// got shell first
+			if(type !== CHANNEL.SHELL) {
 				const rc = ERROR.AUTHENTICATION_FAILED;
 				return rej(rc, ERRMSG[rc]);
 			}
 
-			var rc = ERROR.NONE;
-			if(!has_pty) {
-				rc = ch.pty();
-				has_pty = (rc === ERROR.NONE) ? true: false;
-			}
-
-			if(has_pty && !has_x11) {
-				rc = ch.x11_req(screen);
-				has_x11 = (rc === ERROR.NONE) ? true: false;
-			}
-			
-			if((rc !== ERROR.NONE) && (rc !== ERROR.EAGAIN)) {
-				return rej(rc, ERRMSG[rc])
-			}
-
-			if(has_pty && has_shell) {
-				type = CHANNEL.X11;
-				chloop();
+			const rc = ch.pty_size(width, height);
+			if(rc == ERROR.NONE) {
 				res(rc, ERRMSG[rc]);
 			}
+			else if (rc !== ERROR.EAGAIN) {
+				rej(rc, ERRMSG[rc]);
+			}
 			else {
-				setTimeout(()=> { _async() },200)
+				setTimeout(()=> { _async() },100)
 			}
 		}
 
 		return (iscb) ? _async() : new Promise((resolve, reject) => {
 			res = resolve; rej = reject; _async();
 		})
-	};
+	}
+	;
 
 	return {
 		close,
@@ -1323,32 +1344,64 @@ const channel = (_ch, _istcp) => {
 		//write_err,
 		shell,
 		x11,
+		pty_size,
 		type: () => {return type;},
 		onmessage: (cb) => { onmessage = cb }
 	};
 };
 
 const createSESSION = (socket, _cb) => {
-	const cb = (typeof(_cb) === 'function') ? _cb : nocb;
+	const cb = _cb || nocb;
+	let onerror = cb, onclose = cb;
+
 	var sess = new Module._SESSION(socket);
 
 	let has_logined = false;
+	let has_opened = false;
+	let has_cb = false;
+
+	let count = 0;
+	const _opencb = () => {
+		setTimeout(()=> {
+			if(has_cb) return;
+			if(has_opened) {
+				cb(0, 'OK');
+				has_cb = true;
+			}
+			else if(++count < 25) {
+				_opencb();
+			}
+			else {
+				cb(-1, 'TIMEOUT');
+				has_cb = true;
+			}
+
+		},100);
+	};
+	_opencb();
 
 	if(typeof(socket.binaryType) !== 'undefined') {
 		socket.binaryType = 'arraybuffer';
 		socket.onopen = function() {
 			console.log('WebSocket opened');
+			cb(0, 'opened');
+			has_cb = true;
 		}
 		socket.onerror = function(e) {
 			console.error('WebSocket error', e);
+			onerror(-1, e);
+			has_cb = true;
 		}
 		socket.onclose = function() {
 			console.error('WebSocket closed');
 			//sess.close();
 			delete sess;
+			onclose(-1, socket);
+			has_cb = true;
 		}
 		socket.onmessage = function(e)  {
 			sess.pushdata(e.data);
+			has_opened = true;
 		}
 		sess.send = (buffer) => {
 			socket.send(buffer);
@@ -1357,13 +1410,18 @@ const createSESSION = (socket, _cb) => {
 	else {
 		socket.on('error', (err)=> {
 			console.error('socket error', err);
+			onerror(-1, err);
+			has_cb = true;
 		});
 		socket.on('close', () => {
 			console.error('socket closed');
 			delete sess;
+			onclose(-1, socket);
+			has_cb = true;
 		});
 		socket.on('data', (msg) => {
 			sess.pushdata(msg);
+			has_opened = true;
 		});
 		sess.send = (buffer) => {
 			socket.write(buffer);
@@ -1496,9 +1554,6 @@ const createSESSION = (socket, _cb) => {
 	}
 	;
 
-	if(typeof(cb) !== 'undefined') {
-		setTimeout(()=> { cb();　},50);
-	}
 	return {
 		'SFTP':    createSFTP,
 		'CHANNEL': createCHANNEL,
