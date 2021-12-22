@@ -8,7 +8,7 @@ it run on STREAMs. STREAMs is a WebSocket, WebRTC Datachannel, or nodejs net.Soc
 	<script>
 		let libssh2, session, channel;
 		const user = 'root', passwd='yourpass';
-		Module().then((wasm) => {
+		ssh2Mod().then((wasm) => {
 			libssh2 = wasm;
 			libssh2.init(0);
 			doconn();
@@ -47,6 +47,7 @@ it run on STREAMs. STREAMs is a WebSocket, WebRTC Datachannel, or nodejs net.Soc
 	</script>
 ## EXAMPLES
 A full shell example is [examples/xterm.html](https://github.com/routerplus/libssh2.js/blob/main/examples/xterm.html)
+A direct tcpip example is [examples/tcpip.html](https://github.com/routerplus/libssh2.js/blob/main/examples/tcpip.html)
 
 ## SETUP
 you need a websocket service to forwarding SSH message
@@ -56,7 +57,7 @@ like
 	$ websockify 8100 127.0.0.1:22 & 
 	
 ## BUILD
-you can build it
+you can build it yourself
 
 SEE [BUILD.md](https://github.com/routerplus/libssh2.js/blob/main/BUILD.md)
 
