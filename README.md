@@ -1,32 +1,62 @@
 # libssh2.js
-libssh2 over STREAMs for browsers or nodejs
+is a porting of libssh2 to webassembly for browsers or nodejs
 
-STREAMs is a WebSocket, WebRTC Datachannel, or nodejs net.Socket 
+it run on STREAMs. STREAMs is a WebSocket, WebRTC Datachannel, or nodejs net.Socket
 
-## build libs
+## BASIC USAGE
+	<script src="../dist/libssh2.js"></script>
+	<script>
+		let libssh2, session, channel;
+		const user = 'root', passwd='yourpass';
+		Module().then((wasm) => {
+			libssh2 = wasm;
+			libssh2.init(0);
+			doconn();
+		});
+
+		function doconn() {
+			const url = 'ws://websocketifytossh2';
+			session = libssh2.createSESSION(new WebSocket(url), (rc, err)=> {
+				if(rc === libssh2.ERROR.NONE) {
+					session.login(user, passwd, (rc, msg) => {
+						if(rc === libssh2.ERROR.NONE) {
+							session.CHANNEL((rc, _ch) => {
+								if(rc === libssh2.ERROR.NONE) {
+									channel = _ch;
+									doshell();
+								}
+							});
+						}
+					});
+				}
+			});
+		}
+
+		function doshell() {
+			channel.onmessage((rc, msg) => {
+				consoole.log('got message', msg);
+			});
+			channel.shell((rc, msg) => {
+				console.log(rc, msg);
+				if(rc === libssh2.ERROR.NONE) {
+					console.log('got shell ok\r\n');
+					// some COMMANDs
+					channel.send('cat /proc/version\n');
+			});
+		}
+	</script>
+## EXAMPLES
+A full shell example is examples/xterm.html (https://github.com/routerplus/libssh2.js/blob/main/examples/xterm.html)
+
+## SETUP
+you need a websocket service to forwarding SSH message
+	
+like
+
+	$ websockify 8100 127.0.0.1:22 & 
+	
+## BUILD
+you can build it
 
 SEE [BUILD.md](https://github.com/routerplus/libssh2.js/blob/main/BUILD.md)
-
-## libssh2.js build
-	cd dist
-	emcmake cmake -DCMAKE_BUILD_TYPE=Release ..
-	emmake make
-	cd ..
-
-## test
-	$ node 
-	Welcome to Node.js v14.15.5.
-	Type ".help" for more information.
-	> require('./tests/test.js')
-	> libssh2-1.10.0 loaded
-	handshake ok
-	Fingerprint: xx:xx:xx:xx:xx:xx
-	> session.login('root', 'passwd')
-	Authentication by password succeeded.
-
-or
-	
-	websockify 8100 127.0.0.1:22 & 
-	python3 -m http.server
-	visit http://host:8000/tests/test.html 
 
