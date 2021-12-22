@@ -15,7 +15,7 @@ it run on STREAMs. STREAMs is a WebSocket, WebRTC Datachannel, or nodejs net.Soc
 		});
 
 		function doconn() {
-			const url = 'ws://websocketifytossh2';
+			const url = 'ws://websocket_to_ssh2/api_url';
 			session = libssh2.createSESSION(new WebSocket(url), (rc, err)=> {
 				if(rc === libssh2.ERROR.NONE) {
 					session.login(user, passwd, (rc, msg) => {
