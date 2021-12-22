@@ -1,35 +1,46 @@
 <!doctype html>
 <html>
-  <head>
-    <title>xterm.js & libssh2.js demo</title>
-    <!--
-      WARNING: This demo is a barebones implementation designed for development and evaluation
-      purposes only. It is definitely NOT production ready and does not aim to be so. Exposing the
-      demo to the public as is would introduce security risks for the host.
-    -->
-    <link rel="shortcut icon" type="image/png" href="/logo.png">
-    <link rel="stylesheet" href="./xterm-4.15.0/xterm.css">
-    <script src="./xterm-4.15.0/xterm.min.js"></script>
-    <script src="./xterm-4.15.0/xterm-addon-fit.min.js"></script>
-
-    <script src="../dist/libssh2.js"></script>
-  </head>
-  <body>
-    <center>
-    <h1 style="color: #2D2E2C">xterm.js & libssh2.js: A terminal for the <em style="color: #5DA5D5">web</em></h1>
-
-<input type='text' id='url' style='width: 600px' value='ws://127.0.0.1:7681/xxx' />
-    <input type='button' onclick='doconnect()' id='connect' value='connect'/>
-    <br/><br/>
-    </center>
-    <div>
-	    <div style="margin:0 auto; width: 900px;text-align:right">
-		    <input type='button' onclick='term.clear()' value='clear'>
-	    </div>
-
-	    <div id="terminal" style="margin:0 auto; width: 900px; height: 600px;text-align:right"></div>
-    </div>
-  </body>
+<head>
+		<title>xterm.js & libssh2.js demo</title>
+		<!--
+		WARNING: This demo is a barebones implementation designed for development and evaluation
+		purposes only. It is definitely NOT production ready and does not aim to be so. Exposing the
+		demo to the public as is would introduce security risks for the host.
+		-->
+		<link rel="shortcut icon" type="image/png" href="/logo.png">
+		<link rel="stylesheet" href="./xterm-4.15.0/xterm.css">
+		<style>
+			#url {
+				width: 600px;
+			}
+			#tool {
+				margin:0 auto; 
+				width: 900px;
+				text-align:right
+			}
+			#terminal {
+				margin:0 auto;
+				width: 700px; 
+				height: 600px;
+				text-align:right
+			}
+		</style>
+		<script src="./xterm-4.15.0/xterm.min.js"></script>
+		<script src="./xterm-4.15.0/xterm-addon-fit.min.js"></script>
+		<script src="../dist/libssh2.js"></script>
+</head>
+<body>
+	<center>
+		<h1 style="color: #2D2E2C">xterm.js & libssh2.js: A terminal for the <em style="color: #5DA5D5">web</em></h1>
+		<input type='text' id='url' value='ws://127.0.0.1:7681/xxx' />
+		<input type='button' onclick='doconn()' id='connect' value='connect'/>
+		<br/><br/>
+		<input type='button' onclick='term.clear()' value='clear'>
+	</center>
+	<div>
+		<div id="terminal"></div>
+	</div>
+</body>
 <script>
 var term = new Terminal();
 const fitAddon = new FitAddon.FitAddon();
@@ -41,15 +52,23 @@ term.write('click button to connect\r\n');
 term.focus();
 
 let libssh2;
-Module().then((wasm) => {
+let ws, ch;
+let has_opened = false;
+
+ssh2Mod().then((wasm) => {
 	libssh2 = wasm;
 	libssh2.init(0);
 });
 
-let has_opened = false;
-let ws;
-function doconnect()
+function doconn()
 {
+	fitAddon.fit();
+
+	if(typeof(libssh2) === 'undefined') {
+		term.write('libsh2 load failed\r\n');
+		return;
+	}
+
 	if(has_opened) {
 		ws.close();
 		delete ws;
@@ -62,7 +81,12 @@ function doconnect()
 		const url = document.getElementById('url').value;
 		ws = new WebSocket(url);
 
-		session = libssh2.createSESSION(ws, ()=> {
+		session = libssh2.createSESSION(ws, (rc, err)=> {
+			if(rc !== libssh2.ERROR.NONE) {
+				term.write(`createSESSION error ${rc} ${msg}`);
+				return;
+			}
+
 			term.write('stream connected\r\n');
 			term.focus();
 
@@ -73,16 +97,16 @@ function doconnect()
 				term.write('Fingerprint: ' +
 					session.fingerprint() + '\r\n');
 				dologin();
-			},500);
+			},50);
 		});
 	}
 }
 
-function dologin() {
-	fitAddon.fit();
+function dologin() 
+{
 	term.write('login as: ');
 
-	let user = '';
+	let user  = '';
 	let passwd= '';
 	let mode = 0;
 	let stop = false;
@@ -91,14 +115,14 @@ function dologin() {
 			return;
 
 		if(mode === 0) {
-			if (c.charCodeAt(0) === 127) { // '\b'
+			if (c.charCodeAt(0) === 127) { // 	'\b'
 				if(user.length >= 1) {
 					user = user.substring(0, user.length-1);
 					term.write('\x1b[D');
 					term.write('\x1b[K');
 				}
 			}
-			else if(c.charCodeAt(0) === 13) { // '\n
+			else if(c.charCodeAt(0) === 13) { // 	'\n
 				if(user.length === 0) {
 					term.write('\r\nlogin as: ');
 				}
@@ -120,7 +144,7 @@ function dologin() {
 					term.write('\x1b[K');
 				}
 			}
-			else if(c.charCodeAt(0) === 13) { // '\n') {
+			else if(c.charCodeAt(0) === 13) { //	'\n'
 				mode++;
 				term.write('\r\n');
 			}
@@ -134,15 +158,17 @@ function dologin() {
 			stop = true;
 			session.login(user, passwd, (rc, msg) => {
 				console.log(rc, msg);
-				if(rc == libssh2.ERROR.NONE) {
+				if(rc === libssh2.ERROR.NONE) {
 					doshell()
 				}
 				else {
-					term.write('Access denied\r\n');
+					term.write('Access denied ');
+					term.write(`${rc} ${msg}\r\n`);
+
 					stop = false;
 					mode = 1;
 					passwd = '';
-					term.write(user + "'s password: ");
+					term.write(`${user}'s password: `);
 				}
 			});
 		}
@@ -150,13 +176,15 @@ function dologin() {
 	});
 }
 
-function doshell() {
-
-	let ch;
+function doshell() 
+{
+	term.onData((c) => {
+		ch.send(c);
+	});
 
 	session.CHANNEL((rc, _ch) => {
 		if(rc !== libssh2.ERROR.NONE) {
-			term.write('channel error\r\n');
+			term.write(`channel error ${rc}, ${msg}\r\n`);
 			return;
 		}
 
@@ -167,17 +195,12 @@ function doshell() {
 		ch.shell((rc, msg) => {
 			console.log(rc, msg);
 			if(rc !== libssh2.ERROR.NONE) {
-				term.write('got shell failed\r\n');
+				term.write(`shell error ${rc}, ${msg}\r\n`);
 				return;
 			}
 
-			term.onData((c) => {
-				ch.send(c);
-			});
-
 			ch.pty_size(term.cols, term.rows, (rc, msg) => {
-				console.log('pty_size', rc, msg);
-
+				console.log(`pty_size: ${rc}, ${msg}`);
 			});
 		});
 	});
