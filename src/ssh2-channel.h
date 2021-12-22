@@ -30,6 +30,17 @@
 
 #define BUFF_LEN 4096
 
+/*
+ * CallBack to initialize the forwarding.
+ * Save the channel to loop on it, save the X11 forwarded socket to send
+ * and receive info from our X server.
+ */
+static void x11_callback(LIBSSH2_SESSION *session, LIBSSH2_CHANNEL *channel,
+                         char *shost, int sport, void **abstract)
+{
+
+}
+
 class CHANNEL {
 public:
 	CHANNEL(emscripten::val v)
@@ -43,7 +54,6 @@ public:
 			active(false)
 	{
 		if(channel) {
-			fprintf(stderr, "CHANNEL ok\n");
 			active = true;
 		}
 	}
@@ -112,14 +122,11 @@ public:
 		return (n>0) ? std::string(buffer, n) : nodata;
 	}
 
-	int pty() 
+	int pty(std::string term) 
 	{
 		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		if(active) {
-			rc = libssh2_channel_request_pty(channel, "xterm");
-			if(!rc) {
-				fprintf(stderr, "pty ok\n");
-			}
+			rc = libssh2_channel_request_pty(channel, term.c_str());
 		}
 
 		return rc;
@@ -127,26 +134,21 @@ public:
 
 	int pty_size(int width, int height) 
 	{
-		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		if(active) {
-			rc = libssh2_channel_request_pty_size(channel, 
+			return libssh2_channel_request_pty_size(channel, 
 					width, height);
-			if(!rc) {
-				fprintf(stderr, "pty size(%d, %d) ok\n", width, height);
-			}
 		}
-
-		return rc;
+		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 	}
 
 	int x11_req(int screen) 
 	{
+		libssh2_session_callback_set(session, LIBSSH2_CALLBACK_X11,
+						(void *)x11_callback);
+
 		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		if(active) {
 			rc = libssh2_channel_x11_req(channel, screen);
-			if(!rc) {
-				fprintf(stderr, "x11 ok\n");
-			}
 		}
 
 		return rc;
@@ -164,36 +166,30 @@ public:
 
 	int shell() 
 	{
-		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		if(active) {
-			rc = libssh2_channel_shell(channel);
-			if(!rc) {
-				fprintf(stderr, "shell ok\n");
-			}
+			return libssh2_channel_shell(channel);
 		}
 		
-		return rc;
+		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 	}
 
 	int write(std::string cmd)
 	{
-		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		if(active) {
-			rc = libssh2_channel_write(channel, 
+			return libssh2_channel_write(channel, 
 					cmd.c_str(),cmd.length());
 		}
 
-		return rc;
+		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 	}
 
 	int write_err(std::string cmd)
 	{
-		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		if(active) {
-			rc = libssh2_channel_write_stderr(channel,
+			return libssh2_channel_write_stderr(channel,
 					cmd.c_str(),  cmd.length());
 		}
-		return rc;
+		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 	}
 
 	bool getActive() const {

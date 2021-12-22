@@ -53,7 +53,6 @@ int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
 	auto c = sockets.find(fd);
 	if(c != sockets.end()) {
-		fprintf(stderr, "fd %d has exist!\n", fd);
 		return -1;
 	}
 
@@ -66,7 +65,6 @@ ssize_t recv(int fd, void *buffer, size_t length, int flags)
 {
 	auto c = sockets.find(fd);
 	if(c == sockets.end()) {
-		fprintf(stderr, "fd %d not found!\n", fd);
 		return -1;
 	}
 
@@ -83,7 +81,6 @@ ssize_t send(int fd, const void *buffer, size_t length, int flags)
 {
 	auto c = sockets.find(fd);
 	if(c == sockets.end()) {
-		fprintf(stderr, "fd %d not found!\n", fd);
 		return -1;
 	}
 

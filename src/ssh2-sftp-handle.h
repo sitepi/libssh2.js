@@ -36,7 +36,7 @@ class SFTP_HANDLE {
 public:
 	SFTP_HANDLE(emscripten::val handle)
 	{
-		fprintf(stderr, "SFTP_HANDLE CANNOT CREATE DIRECTLY!\n");
+		//fprintf(stderr, "SFTP_HANDLE CANNOT CREATE DIRECTLY!\n");
 	}
 
 	SFTP_HANDLE(LIBSSH2_SFTP *sf, LIBSSH2_SFTP_HANDLE *hand) :
@@ -44,7 +44,7 @@ public:
 		handle(hand)
 	{
 		if(handle) {
-			fprintf(stderr, "SFTP_HANDLE ok\n");
+			//fprintf(stderr, "SFTP_HANDLE ok\n");
 			active = true;
 			memset(&attrs, '\0', sizeof(attrs));
 			memset(&st, '\0', sizeof(st));

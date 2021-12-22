@@ -34,9 +34,11 @@ static int ssh2_init(int flags)
 
 	int rc = libssh2_init(flags);
 	_init = (rc) ? false: true;
+	#if 0
 	if(_init) {
 		printf("libssh2-%s loaded\n", libssh2_version(0));
 	}
+	#endif
 	return rc;
 }
 
@@ -44,7 +46,7 @@ static void ssh2_exit()
 {
 	libssh2_exit();
 	_init = false;
-	printf("libssh2-%s exit\n", libssh2_version(0));
+	//printf("libssh2-%s exit\n", libssh2_version(0));
 }
 
 static std::string ssh2_version()

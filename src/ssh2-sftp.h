@@ -46,7 +46,7 @@ public:
 			sftp(sf)
 	{
 		if(sftp) {
-			fprintf(stderr, "SFTP ok\n");
+			//fprintf(stderr, "SFTP ok\n");
 			active = true;
 		}
 	}

@@ -47,7 +47,6 @@ public:
 		fd = socket(AF_INET, SOCK_STREAM, 0);
 
 		if(connect(fd, (struct sockaddr*)this, sizeof(*this))!= 0) {
-			fprintf(stderr, "failed to connect!\n");
 			error = 1;
 			return;
 		}
@@ -179,7 +178,6 @@ public:
 				error = libssh2_session_last_errno(session);
 			}
 			else {
-				fprintf(stderr, "Authentication methods: %s\n", m);
 				methods = m;
 			}
 		}
@@ -201,7 +199,6 @@ public:
 		}
 		return rc;
 	}
-
 
 	int getError() const {
 		return error;
@@ -226,7 +223,6 @@ private:
 			has_opened = true;
 		}
 		else if(rc != LIBSSH2_ERROR_EAGAIN) {
-			fprintf(stderr, "Failure establishing SSH session\n");
 			error = rc;
 		}
 
