@@ -46,7 +46,7 @@ it run on STREAMs. STREAMs is a WebSocket, WebRTC Datachannel, or nodejs net.Soc
 		}
 	</script>
 ## EXAMPLES
-A full shell example is [examples/xterm.html] (https://github.com/routerplus/libssh2.js/blob/main/examples/xterm.html)
+A full shell example is [examples/xterm.html](https://github.com/routerplus/libssh2.js/blob/main/examples/xterm.html)
 
 ## SETUP
 you need a websocket service to forwarding SSH message
