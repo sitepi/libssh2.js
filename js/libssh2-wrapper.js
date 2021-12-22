@@ -1219,6 +1219,10 @@ const channel = (_ch, _istcp) => {
 	x11loop = chloop
 	;
 
+	if(istcp) {
+		chloop();
+	}
+
 	const shell = (_cb) => {
 		const iscb = (typeof(_cb) === 'function');
 		let res = _cb || nocb, rej = _cb || nocb;
@@ -1238,7 +1242,7 @@ const channel = (_ch, _istcp) => {
 
 			var rc = ERROR.NONE;
 			if(!has_pty) {
-				rc = ch.pty();
+				rc = ch.pty("xterm");
 				has_pty = (rc === ERROR.NONE) ? true: false;
 			}
 
@@ -1269,28 +1273,48 @@ const channel = (_ch, _istcp) => {
 		const iscb = (typeof(_cb) === 'function');
 		let res = _cb || nocb, rej = _cb || nocb;
 
+		let has_x11 = false, has_pty = false, has_shell = false;;
 		const _async = () => {
 			if(!ch.active) {
 				const rc = ERROR.AUTHENTICATION_FAILED;
 				return rej(rc, ERRMSG[rc]);
 			}
 
-			// got shell first
-			if(type !== CHANNEL.SHELL) {
+			if(type !== CHANNEL.UNKNOWN) {
 				const rc = ERROR.AUTHENTICATION_FAILED;
 				return rej(rc, ERRMSG[rc]);
 			}
 
-			const rc = ch.x11_req(screen);
-			if(rc == ERROR.NONE) {
+			var rc = ERROR.NONE;
+			if(!has_pty) {
+				rc = ch.pty("xterm");
+				has_pty = (rc === ERROR.NONE) ? true: false;
+			}
+
+			if(has_pty && !has_x11) {
+				rc = ch.x11_req(screen);
+				has_x11 = (rc === ERROR.NONE) ? true: false;
+			}
+			if((rc !== ERROR.NONE) && (rc !== ERROR.EAGAIN)) {
+				return rej(rc, ERRMSG[rc])
+			}
+
+			if(has_pty && has_x11 && !has_shell) {
+				rc = ch.shell();
+				has_shell = (rc === ERROR.NONE) ? true: false;
+			}
+			
+			if((rc !== ERROR.NONE) && (rc !== ERROR.EAGAIN)) {
+				return rej(rc, ERRMSG[rc])
+			}
+
+			if(has_pty && has_x11 && has_shell) {
 				type = CHANNEL.X11;
+				x11loop();
 				res(rc, ERRMSG[rc]);
 			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
 			else {
-				setTimeout(()=> { _async() },100)
+				setTimeout(()=> { _async() },200)
 			}
 		}
 
@@ -1354,7 +1378,7 @@ const createSESSION = (socket, _cb) => {
 	const cb = _cb || nocb;
 	let onerror = cb, onclose = cb;
 
-	var sess = new Module._SESSION(socket);
+	var sess = new ssh2Mod._SESSION(socket);
 
 	let has_logined = false;
 	let has_opened = false;
@@ -1564,8 +1588,8 @@ const createSESSION = (socket, _cb) => {
 	}
 };
 
-Module['ERROR'] = ERROR;
-Module['ERRMSG'] = ERRMSG;
-Module['SFTP'] = SFTP;
-Module['CHANNEL'] = CHANNEL;
-Module['createSESSION'] = createSESSION;
+ssh2Mod['ERROR'] = ERROR;
+ssh2Mod['ERRMSG'] = ERRMSG;
+ssh2Mod['SFTP'] = SFTP;
+ssh2Mod['CHANNEL'] = CHANNEL;
+ssh2Mod['createSESSION'] = createSESSION;
