@@ -34,7 +34,7 @@ it run on STREAMs. STREAMs is a WebSocket, WebRTC Datachannel, or nodejs net.Soc
 
 		function doshell() {
 			channel.onmessage((rc, msg) => {
-				consoole.log('got message', msg);
+				console.log('got message', msg);
 			});
 			channel.shell((rc, msg) => {
 				console.log(rc, msg);
