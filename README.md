@@ -8,7 +8,7 @@ it run on STREAMs. STREAMs is a WebSocket, WebRTC Datachannel, or nodejs net.Soc
 	<script>
 		let libssh2, session, channel;
 		const user = 'root', passwd='yourpass';
-		ssh2Mod().then((wasm) => {
+		ssh2Loader().then((wasm) => {
 			libssh2 = wasm;
 			libssh2.init(0);
 			doconn();
@@ -50,12 +50,14 @@ A full shell example is [examples/xterm.html](https://github.com/routerplus/libs
 
 A direct tcpip example is [examples/tcpip.html](https://github.com/routerplus/libssh2.js/blob/main/examples/tcpip.html)
 
+A x11 forwarding example is [examples/x11.html](https://github.com/routerplus/libssh2.js/blob/main/examples/tcpip.html), it success but miss x11 handler
+
 ## SETUP
 you need a websocket service to forwarding SSH message
 	
 like
 
-	$ websockify 8100 127.0.0.1:22 & 
+	$ websockify 7681 127.0.0.1:22 & 
 	
 ## BUILD
 you can build it yourself
