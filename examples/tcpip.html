@@ -68,7 +68,7 @@ let libssh2;
 let ws, ch;
 let has_opened = false;
 
-ssh2Mod().then((wasm) => {
+ssh2Loader().then((wasm) => {
 	libssh2 = wasm;
 	libssh2.init(0);
 });
@@ -93,8 +93,7 @@ function doconn()
 		delete ws;
 		has_opened = false;
 		document.getElementById('connect').value = 'connect';
-		term.write('\r\nstream disconnected\r\n');
-		return;
+		return term.write('\r\nstream disconnected\r\n');
 	}
 	else {
 		const url = document.getElementById('url').value;
@@ -102,8 +101,7 @@ function doconn()
 
 		session = libssh2.createSESSION(ws, (rc, err)=> {
 			if(rc !== libssh2.ERROR.NONE) {
-				term.write(`createSESSION error ${rc} ${msg}`);
-				return;
+				return term.write(`createSESSION error ${rc} ${msg}`);
 			}
 
 			term.write('stream connected\r\n');
@@ -132,8 +130,7 @@ function dologin()
 	term.onData((c) => {
 		if(stop)
 			return;
-
-		if(mode === 0) {
+		else if(mode === 0) {
 			if (c.charCodeAt(0) === 127) { // 	'\b'
 				if(user.length >= 1) {
 					user = user.substring(0, user.length-1);
@@ -223,8 +220,8 @@ function dotcpip()
 				`Host: ${ipaddr}\r\n` +
 				'User-Agent: curl/7.55.1' +
 				'Accept: */*\r\n' +
-				'\r\n\r\n');
-		}, 1000);
+				'\r\n');
+		}, 100);
 	});
 }
 </script>

@@ -1,33 +1,28 @@
 <!doctype html>
 <html>
 <head>
-		<title>xterm.js & libssh2.js demo</title>
-		<!--
-		WARNING: This demo is a barebones implementation designed for development and evaluation
-		purposes only. It is definitely NOT production ready and does not aim to be so. Exposing the
-		demo to the public as is would introduce security risks for the host.
-		-->
-		<link rel="shortcut icon" type="image/png" href="/logo.png">
-		<link rel="stylesheet" href="./xterm-4.15.0/xterm.css">
-		<style>
-			#url {
-				width: 600px;
-			}
-			#tool {
-				margin:0 auto; 
-				width: 900px;
-				text-align:right
-			}
-			#terminal {
-				margin:0 auto;
-				width: 700px; 
-				height: 600px;
-				text-align:right
-			}
-		</style>
-		<script src="./xterm-4.15.0/xterm.min.js"></script>
-		<script src="./xterm-4.15.0/xterm-addon-fit.min.js"></script>
-		<script src="../dist/libssh2.js"></script>
+	<title>xterm.js & libssh2.js demo</title>
+	<!--
+	WARNING: This demo is a barebones implementation designed for development and evaluation
+	purposes only. It is definitely NOT production ready and does not aim to be so. Exposing the
+	demo to the public as is would introduce security risks for the host.
+	-->
+	<link rel="shortcut icon" type="image/png" href="/logo.png">
+	<link rel="stylesheet" href="./xterm-4.15.0/xterm.css">
+	<style>
+		#url {
+			width: 600px;
+		}
+		#terminal {
+			margin:0 auto;
+			width: 700px; 
+			height: 600px;
+			text-align:right
+		}
+	</style>
+	<script src="./xterm-4.15.0/xterm.min.js"></script>
+	<script src="./xterm-4.15.0/xterm-addon-fit.min.js"></script>
+	<script src="../dist/libssh2.js"></script>
 </head>
 <body>
 	<center>
@@ -55,7 +50,7 @@ let libssh2;
 let ws, ch;
 let has_opened = false;
 
-ssh2Mod().then((wasm) => {
+ssh2Loader().then((wasm) => {
 	libssh2 = wasm;
 	libssh2.init(0);
 });
@@ -65,8 +60,7 @@ function doconn()
 	fitAddon.fit();
 
 	if(typeof(libssh2) === 'undefined') {
-		term.write('libsh2 load failed\r\n');
-		return;
+		return term.write('libsh2 load failed\r\n');
 	}
 
 	if(has_opened) {
@@ -74,8 +68,7 @@ function doconn()
 		delete ws;
 		has_opened = false;
 		document.getElementById('connect').value = 'connect';
-		term.write('\r\nstream disconnected\r\n');
-		return;
+		return term.write('\r\nstream disconnected\r\n');
 	}
 	else {
 		const url = document.getElementById('url').value;
@@ -83,8 +76,7 @@ function doconn()
 
 		session = libssh2.createSESSION(ws, (rc, err)=> {
 			if(rc !== libssh2.ERROR.NONE) {
-				term.write(`createSESSION error ${rc} ${msg}`);
-				return;
+				return term.write(`createSESSION error ${rc} ${msg}`);
 			}
 
 			term.write('stream connected\r\n');
@@ -113,8 +105,7 @@ function dologin()
 	term.onData((c) => {
 		if(stop)
 			return;
-
-		if(mode === 0) {
+		else if(mode === 0) {
 			if (c.charCodeAt(0) === 127) { // 	'\b'
 				if(user.length >= 1) {
 					user = user.substring(0, user.length-1);
@@ -184,8 +175,7 @@ function doshell()
 
 	session.CHANNEL((rc, _ch) => {
 		if(rc !== libssh2.ERROR.NONE) {
-			term.write(`channel error ${rc}, ${msg}\r\n`);
-			return;
+			return term.write(`channel error ${rc}, ${msg}\r\n`);
 		}
 
 		ch = _ch;
@@ -195,8 +185,7 @@ function doshell()
 		ch.shell((rc, msg) => {
 			console.log(rc, msg);
 			if(rc !== libssh2.ERROR.NONE) {
-				term.write(`shell error ${rc}, ${msg}\r\n`);
-				return;
+				return term.write(`shell error ${rc}, ${msg}\r\n`);
 			}
 
 			ch.pty_size(term.cols, term.rows, (rc, msg) => {
