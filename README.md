@@ -50,7 +50,7 @@ A full shell example is [examples/xterm.html](https://github.com/routerplus/libs
 
 A direct tcpip example is [examples/tcpip.html](https://github.com/routerplus/libssh2.js/blob/main/examples/tcpip.html)
 
-A x11 forwarding example is [examples/x11.html](https://github.com/routerplus/libssh2.js/blob/main/examples/tcpip.html), it success but miss x11 handler
+A x11 forwarding example is [examples/x11.html](https://github.com/routerplus/libssh2.js/blob/main/examples/x11.html), it success but miss x11 handler
 
 ## SETUP
 you need a websocket service to forwarding SSH message
