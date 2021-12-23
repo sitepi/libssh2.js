@@ -27,13 +27,14 @@ function test()
 			else {
 				has_logined = true;
 				console.log(user,'logined');
+				sftp_test();
 			}
 		});
 	});
 	socket.connect(22, '127.0.0.1');
 }
 
-function exec_test() {
+function sftp_test() {
 	var sf;
 	session.SFTP((rc, _sf) => {
 		console.log('rc=', rc);
