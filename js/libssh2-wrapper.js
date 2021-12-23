@@ -1378,7 +1378,7 @@ const createSESSION = (socket, _cb) => {
 	const cb = _cb || nocb;
 	let onerror = cb, onclose = cb;
 
-	var sess = new ssh2Mod._SESSION(socket);
+	var sess = new ssh2Loader._SESSION(socket);
 
 	let has_logined = false;
 	let has_opened = false;
@@ -1588,8 +1588,8 @@ const createSESSION = (socket, _cb) => {
 	}
 };
 
-ssh2Mod['ERROR'] = ERROR;
-ssh2Mod['ERRMSG'] = ERRMSG;
-ssh2Mod['SFTP'] = SFTP;
-ssh2Mod['CHANNEL'] = CHANNEL;
-ssh2Mod['createSESSION'] = createSESSION;
+ssh2Loader['ERROR'] = ERROR;
+ssh2Loader['ERRMSG'] = ERRMSG;
+ssh2Loader['SFTP'] = SFTP;
+ssh2Loader['CHANNEL'] = CHANNEL;
+ssh2Loader['createSESSION'] = createSESSION;
