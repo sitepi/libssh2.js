@@ -665,10 +665,11 @@ const sftp = (_sf) => {
 			res = resolve; rej = reject; _async();
 		})
 	},
-	open = (path, flags, mode, type, _cb) => {
+	open = (path, flags, mode, _cb) => {
 		const iscb = (typeof(_cb) === 'function');
 		let res = _cb || nocb, rej = _cb || nocb;
-		
+		const type = SFTP.OPENFILE;
+
 		var h;
 		const _async = () => {
 
@@ -680,15 +681,11 @@ const sftp = (_sf) => {
 			}
 			
 			const rc = sf.error;
-			if(rc === ERROR.NONE) {
-				;
+			if(h.active) {
+				res(rc, sftp_handle(h));
 			}
 			else if (rc !== ERROR.EAGAIN) {
 				rej(rc, ERRMSG[rc]);
-			}
-
-			if(h.active) {
-				res(rc, sftp_handle(h));
 			}
 			else {
 				setTimeout(()=> { _async() },100)
@@ -713,15 +710,11 @@ const sftp = (_sf) => {
 			}
 
 			const rc = sf.error;
-			if(rc === ERROR.NONE) {
-				;
+			if(h.active) {
+				res(rc, sftp_handle(h, true));
 			}
 			else if (rc !== ERROR.EAGAIN) {
 				rej(rc, ERRMSG[rc]);
-			}
-
-			if(h.active) {
-				res(rc, sftp_handle(h, true));
 			}
 			else {
 				setTimeout(()=> { _async() },100)
@@ -743,7 +736,8 @@ const sftp = (_sf) => {
 				res(rc, msg);
 			}
 			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
+				const err = (rc === ERROR.SFTP_PROTOCOL) ? ERRMSG[rc] : SFTP.STATMSG[rc];
+				rej(rc, err);
 			}
 			else {
 				setTimeout(()=> { _async() },100)
@@ -784,10 +778,10 @@ const sftp = (_sf) => {
 			const msg = sf.realpath(path);
 			const rc  = sf.error;
 			if(rc == ERROR.NONE) {
-				res(rc, msg);
+				return res(rc, msg);
 			}
 			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
+				return rej(rc, ERRMSG[rc]);
 			}
 			else {
 				setTimeout(()=> { _async() },100)
@@ -1562,10 +1556,13 @@ const createSESSION = (socket, _cb) => {
 			else if(!ch.active) {
 				ch = sess.tcpip(ipaddr, port);
 			}
-			
+
+			const rc = sess.error;
 			if(ch.active) {
-				const rc = 0;
-				res(rc, channel(ch, true));
+				return res(ERROR.NONE, channel(ch, true));
+			}
+			else if(rc != ERROR.EAGAIN) {
+				return rej(rc, ERRMSG[rc]);
 			}
 			else {
 				setTimeout(() => { _async()}, 100);
