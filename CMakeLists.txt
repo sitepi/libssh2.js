@@ -27,7 +27,7 @@ set(LIBSSH2_WRAPPER_JS "${CMAKE_CURRENT_SOURCE_DIR}/js/libssh2-wrapper.js")
 include_directories("${DEPS_DIR}/include")
 link_directories("${DEPS_DIR}/lib")
 
-set(WASM_OPTS "-s MODULARIZE --bind --js-library ${LIBSSH2_JS_LIB} --post-js ${LIBSSH2_WRAPPER_JS} -s EXPORT_NAME='ssh2Loader'")
+set(WASM_OPTS "-s MODULARIZE --bind --js-library ${LIBSSH2_JS_LIB} --post-js ${LIBSSH2_WRAPPER_JS} -s EXPORT_NAME='ssh2Loader' -s WASM_BIGINT")
 set(DEPS_LIBS ssh2 mbedtls mbedcrypto z)
 
 add_executable(${LIBSSH2_JS_PROG} ${LIBSSH2_JS_SRC})

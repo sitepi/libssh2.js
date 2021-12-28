@@ -17,7 +17,7 @@ libssh2 over STREAMs on browser | nodejs
 ### zlib
 	cd zlib-1.2.11
 	emconfigure ./configure --static --prefix=${EMPORTS}
-	emmake make -j2 
+	emmake make -j4 
 	emmake make install
 	cd ..
 
@@ -34,7 +34,7 @@ libssh2 over STREAMs on browser | nodejs
 		-DZLIB_INCLUDE_DIR=${EMPORTS}/include \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX=${EMPORTS}
-	emmake make -j2
+	emmake make -j4 
 	emmake make install 
 	cd ../../
 
@@ -58,7 +58,7 @@ libssh2 over STREAMs on browser | nodejs
 		-DMBEDCRYPTO_LIBRARY=${EMPORTS} \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX=${EMPORTS} 
-	emmake make -j2 
+	emmake make -j4 
 	emmake make install 
 	cd ../../
 
@@ -66,8 +66,3 @@ libssh2 over STREAMs on browser | nodejs
 	rm -rf deps/builds
 
 all libs has installed in deps
-
-### libssh2-js
-	cd dist
-	emcmake cmake .. -DCMAKE_BUILD_TYPE=Release
-	emmake make -j2
