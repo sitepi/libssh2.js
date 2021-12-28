@@ -20,6 +20,10 @@
  * SOFTWARE.
  */
 
+
+#include <libssh2.h>
+#include <libssh2_sftp.h>
+
 #include "ssh2-session.h"
 #include "ssh2-channel.h"
 #include "ssh2-sftp.h"

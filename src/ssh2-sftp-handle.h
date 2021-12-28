@@ -214,20 +214,6 @@ public:
 	}
 
 private:
-	emscripten::val & attrs_object(emscripten::val &v, 
-			const LIBSSH2_SFTP_ATTRIBUTES *attrs)
-	{
-		v.set("flags", attrs->flags);
-		v.set("filesize", attrs->filesize);
-		v.set("uid", attrs->uid);
-		v.set("gid", attrs->gid);
-		v.set("perm", attrs->permissions);
-		v.set("atime", attrs->atime);
-		v.set("mtime", attrs->mtime);
-
-		return v;
-	}
-private:
 	LIBSSH2_SFTP_HANDLE *handle;
 	LIBSSH2_SESSION     *session;
 	LIBSSH2_SFTP        *sftp;

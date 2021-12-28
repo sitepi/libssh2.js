@@ -30,6 +30,8 @@
 
 #define BUFF_LEN 4096
 
+static char sshost[64];
+static int ssport = 0;
 /*
  * CallBack to initialize the forwarding.
  * Save the channel to loop on it, save the X11 forwarded socket to send
@@ -38,7 +40,9 @@
 static void x11_callback(LIBSSH2_SESSION *session, LIBSSH2_CHANNEL *channel,
                          char *shost, int sport, void **abstract)
 {
-
+	fprintf(stderr, "shost: %s, sport: %d\r\n", shost, sport);
+	strcpy(sshost, shost);
+	ssport = sport;
 }
 
 class CHANNEL {
@@ -100,8 +104,14 @@ public:
 	{
 		int n = 0;
 		if(active) {
+			if(ssport != 0) {
+				n = sprintf(buffer, "{\"shost\":\"%s\",\"sport\":%d}", sshost, ssport);
+				error = 0;
+			}
+			else {
 			n = libssh2_channel_read(channel, buffer, BUFF_LEN);
 			error = (n < 0) ? libssh2_session_last_errno(session) : 0;
+			}
 		}
 		else {
 			error = LIBSSH2_ERROR_CHANNEL_UNKNOWN;

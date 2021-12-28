@@ -167,11 +167,10 @@ public:
 		return LIBSSH2_ERROR_SOCKET_NONE;
 	}
 
-	emscripten::val stat(std::string path, 
+	LIBSSH2_SFTP_ATTRIBUTES stat(std::string path, 
 				int type = LIBSSH2_SFTP_STAT)
 	{
 		int rc = 0;
-		emscripten::val v = emscripten::val::object();
 
 		memset(&attrs, '\0', sizeof(attrs));
 		error = LIBSSH2_ERROR_SOCKET_NONE;
@@ -181,11 +180,8 @@ public:
 						path.length(),
 						type, &attrs);
 			error = (rc) ? rc : 0;
-			if(!rc) {
-				return attrs_object(v, &attrs);
-			}
 		}
-		return v;
+		return attrs;
 	}
 
 	LIBSSH2_SFTP_STATVFS statvfs(std::string path)
@@ -230,20 +226,6 @@ public:
 		return error;
 	}
 
-private:
-	emscripten::val attrs_object(emscripten::val &v, 
-				const LIBSSH2_SFTP_ATTRIBUTES *attrs)
-	{
-		v.set("flags", attrs->flags);
-		v.set("filesize", attrs->filesize);
-		v.set("uid", attrs->uid);
-		v.set("gid", attrs->gid);
-		v.set("perm", attrs->permissions);
-		v.set("atime", attrs->atime);
-		v.set("mtime", attrs->mtime);
-
-		return v;
-	}
 private:
 	LIBSSH2_SFTP 	    *sftp;
 	LIBSSH2_SESSION     *session;
