@@ -1,57 +1,86 @@
 <!doctype html>
 <html>
 <head>
-	<title>libssh2.js SCP demo</title>
+	<title>xterm.js & libssh2.js demo</title>
+	<!--
+	WARNING: This demo is a barebones implementation designed for development and evaluation
+	purposes only. It is definitely NOT production ready and does not aim to be so. Exposing the
+	demo to the public as is would introduce security risks for the host.
+	-->
 	<link rel="shortcut icon" type="image/png" href="/logo.png">
 	<link rel="stylesheet" href="./xterm-4.15.0/xterm.css">
 	<style>
 		#url {
 			width: 600px;
 		}
-		#terminal {
-			margin:0 auto;
-			width: 900px; 
-			height: 600px;
-			text-align:right
-		}
 	</style>
+	<script src="./xterm-4.15.0/xterm.min.js"></script>
+	<script src="./xterm-4.15.0/xterm-addon-fit.min.js"></script>
 	<script src="../dist/libssh2.js"></script>
 </head>
-
 <body>
 	<center>
 		<h1 style="color: #2D2E2C">libssh2.js: <em style="color: #5DA5D5">SCP DEMO</em></h1>
 		<input type='text' id='url' value='ws://127.0.0.1:7681/xxx' />
 		<input type='button' onclick='doconn()' id='connect' value='connect'/>
+		<div>
+			USER:<br/>
+			<input type="text" id="user" value="jie"><br/>
+			PASSWD:<br/>
+			<input type="password" id="passwd" value="G9923142"><br/>
+		</div>
 	</center>
 	<div>
-		<div id="list"></div>
+		<div id="terminal"></div>
+		<div id='logs'></div>
 	</div>
 </body>
 <script>
+
 let libssh2;
 let ws, ch;
 let has_opened = false;
+let session;
+let wd;
 
 ssh2Loader().then((wasm) => {
 	libssh2 = wasm;
 	libssh2.init(0);
 });
 
+function logs(msg, overlap)
+{
+	const o = document.getElementById('logs');
+	if(overlap && (overlap === true)) {
+		o.innerText = msg;
+	}
+	else {
+		o.innerText += '\r\n' + msg;
+	}
+}
+
 function doconn()
 {
-	fitAddon.fit();
-
 	if(typeof(libssh2) === 'undefined') {
-		return term.write('libsh2 load failed\r\n');
+		return logs('libssh2 load failed');
+	}
+
+	const user  = document.getElementById('user').value;
+	const passwd= document.getElementById('passwd').value;
+
+	if((user === '') || (passwd === '')) {
+		return logs('user info cannot null');
 	}
 
 	if(has_opened) {
+		sf.shutdown();
+
 		ws.close();
 		delete ws;
 		has_opened = false;
 		document.getElementById('connect').value = 'connect';
-		return term.write('\r\nstream disconnected\r\n');
+		//return logs('stream disconnected');
+		return;
 	}
 	else {
 		const url = document.getElementById('url').value;
@@ -59,123 +88,155 @@ function doconn()
 
 		session = libssh2.createSESSION(ws, (rc, err)=> {
 			if(rc !== libssh2.ERROR.NONE) {
-				return term.write(`createSESSION error ${rc} ${msg}`);
+				return logs(`createSESSION error ${rc} ${err}`);
 			}
 
-			term.write('stream connected\r\n');
-			term.focus();
+			//logs('stream connected');
 
 			has_opened = true;
 			document.getElementById('connect').value = 'disconnect';
 			
 			setTimeout(() => {
-				term.write('Fingerprint: ' +
-					session.fingerprint() + '\r\n');
+				logs('Fingerprint: '+ session.fingerprint());
 				dologin();
-			},50);
+			},500);
 		});
 	}
 }
 
 function dologin() 
 {
-	term.write('login as: ');
+        const user  = document.getElementById('user').value;
+        const passwd= document.getElementById('passwd').value;
 
-	let user  = '';
-	let passwd= '';
-	let mode = 0;
-	let stop = false;
-	term.onData((c) => {
-		if(stop)
-			return;
-		else if(mode === 0) {
-			if (c.charCodeAt(0) === 127) { // 	'\b'
-				if(user.length >= 1) {
-					user = user.substring(0, user.length-1);
-					term.write('\x1b[D');
-					term.write('\x1b[K');
-				}
-			}
-			else if(c.charCodeAt(0) === 13) { // 	'\n
-				if(user.length === 0) {
-					term.write('\r\nlogin as: ');
-				}
-				else {
-					mode++;
-					term.write('\r\n'+user+"'s password: ");
-				}
-			}
-			else {
-				user += c;
-				term.write(c);
-			}
+	session.login(user, passwd, (rc, msg) => {
+		console.log(rc, msg);
+		if(rc === libssh2.ERROR.NONE) {
+			doscp();
 		}
-		else if(mode === 1) {
-			if (c.charCodeAt(0) === 127) { //	'\b'
-				if(passwd.length >= 1) {
-					passwd=passwd.substring(0,passwd.length-1);
-					term.write('\x1b[D');
-					term.write('\x1b[K');
-				}
-			}
-			else if(c.charCodeAt(0) === 13) { //	'\n'
-				mode++;
-				term.write('\r\n');
-			}
-			else {
-				passwd += c;
-				term.write('*');
-			}
-		}
-
-		if(mode === 2) {
-			stop = true;
-			session.login(user, passwd, (rc, msg) => {
-				console.log(rc, msg);
-				if(rc === libssh2.ERROR.NONE) {
-					doshell()
-				}
-				else {
-					term.write('Access denied ');
-					term.write(`${rc} ${msg}\r\n`);
-
-					stop = false;
-					mode = 1;
-					passwd = '';
-					term.write(`${user}'s password: `);
-				}
-			});
+		else {
+			logs('Access denied ');
 		}
 
 	});
 }
 
-function doshell() 
-{
-	term.onData((c) => {
-		ch.send(c);
-	});
-
-	session.CHANNEL((rc, _ch) => {
+function doscp() {
+	session.SFTP((rc, _sf) => {
 		if(rc !== libssh2.ERROR.NONE) {
-			return term.write(`channel error ${rc}, ${msg}\r\n`);
+			return logs(`doscp error ${rc}, ${_sf}\r\n`);
 		}
 
-		ch = _ch;
-		ch.onmessage((rc, msg) => {
-			term.write(msg);
-		});
-		ch.shell((rc, msg) => {
-			console.log(rc, msg);
-			if(rc !== libssh2.ERROR.NONE) {
-				return term.write(`shell error ${rc}, ${msg}\r\n`);
-			}
+		sf = _sf;
 
-			ch.pty_size(term.cols, term.rows, (rc, msg) => {
-				console.log(`pty_size: ${rc}, ${msg}`);
-			});
+		sf.realpath('.', (rc, msg) => {
+			logs('current directory: ' + msg);
+
+			wd = msg;
+
+			dolist();
 		});
 	});
 }
+
+let files = [];
+function dolist() 
+{
+	var o;
+	let count = 0;
+
+	logs('query ' + wd);
+
+	const tranverse = (o) => {
+		o.readdir((rc, msg) => {
+			if(rc === libssh2.ERROR.NONE) {
+				if(msg !== ''){ 
+					count++;
+					//logs(msg);
+					files.push(msg);
+
+					setTimeout(() => {
+					tranverse(o);
+					}, 10);
+				}
+				else if(count === 0) {
+					count++;
+					setTimeout(() => {
+					tranverse(o);
+					},50);
+				}
+				else {
+					o.close((rc, msg) => {
+						//logs('dir closed');
+						doattrs();
+					});
+				}
+			}
+			else {
+				logs('error' + err + '\t' + msg);
+			}
+
+		});
+	}
+
+	sf.opendir(wd, (rc, msg) => {
+		files = [];
+		if(rc === libssh2.ERROR.NONE) {
+			o = msg;
+			setTimeout(() => {
+			tranverse(o);
+			}, 10);
+		}
+		else {
+			logs('rc=' + rc + '\t' + msg);
+		}
+	});
+}
+
+let attrs_count = 0;
+
+let details = [];
+function doattrs()
+{
+	details.sort();
+
+	if(attrs_count < files.length) {
+		sf.stat(files[attrs_count], (rc, msg) => {
+			if(rc === libssh2.ERROR.NONE) {
+				details[files[attrs_count]] = msg;
+				//console.log('doattrs', rc, msg);
+
+				setTimeout(()=> {
+					attrs_count++;
+					doattrs();
+				},10);
+			}
+			else {
+				showattrs();
+			}
+		});
+	}
+	else {
+		showattrs();
+	}
+}
+
+function showattrs()
+{
+//	details.sort();
+
+	for(k in details) {
+		o = details[k];
+		logs(k + '\t' + 
+			'size:' + o.filesize + ' ' +
+			'flags:' + o.flags + ' ' +
+			'gid:' + o.gid + ' ' +
+			'uid:' + o.uid + ' ' +
+			'perm:' + o.perm + ' ' +
+			'atime:' + new Date(o.atime *1000) + ' ' +
+			'mtime:' + new Date(o.mtime *1000));
+	}
+}
+
 </script>
 </html>

@@ -101,7 +101,7 @@ function doconn()
 
 		session = libssh2.createSESSION(ws, (rc, err)=> {
 			if(rc !== libssh2.ERROR.NONE) {
-				return term.write(`createSESSION error ${rc} ${msg}`);
+				return term.write(`createSESSION error ${rc} ${err}`);
 			}
 
 			term.write('stream connected\r\n');
@@ -203,7 +203,7 @@ function dotcpip()
 
 	session.TCPIP(ipaddr, port, (rc, _ch) => {
 		if(rc !== libssh2.ERROR.NONE) {
-			return term.write(`channel error ${rc}, ${msg}\r\n`);
+			return term.write(`channel error ${rc}, ${_ch}\r\n`);
 		}
 
 		term.write('tcp ip tunnel ok\r\n');
