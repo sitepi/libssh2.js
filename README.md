@@ -5,7 +5,7 @@ it run on STREAMs. STREAMs is a WebSocket, WebRTC Datachannel, or nodejs net.Soc
 
 a DEMO
 
-https://peer2.io/c/q1bco
+tbd
 
 
 ## BASIC USAGE
