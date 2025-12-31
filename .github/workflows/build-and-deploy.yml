@@ -176,26 +176,9 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: libssh2-js-dist
+          name: libssh2-js-dist-${{ github.ref_name }}
           path: dist/
-          retention-days: 30
-          
-      - name: Commit and push to dist directory
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          
-          # Add dist files
-          git add -f dist/
-          
-          # Check if there are changes
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "🤖 Auto-build: Update dist files [skip ci]"
-            git push
-          fi
+          retention-days: 90
           
       - name: Create Release on Tag
         if: startsWith(github.ref, 'refs/tags/')
@@ -204,5 +187,10 @@ jobs:
           files: |
             dist/libssh2.js
             dist/libssh2.wasm
+            dist/libssh2-library.js
+            dist/libssh2-wrapper.js
+          draft: false
+          prerelease: false
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
