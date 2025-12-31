@@ -36,6 +36,7 @@
 
 #include <emscripten/bind.h>
 
+#include "ssh2-common.h"
 #include "ssh2-channel.h"
 #include "ssh2-sftp.h"
 

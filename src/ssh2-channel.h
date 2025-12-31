@@ -31,9 +31,7 @@
 #include <cstdio>
 #include <array>
 
-#ifndef BUFF_LEN
-constexpr size_t BUFF_LEN = 4096;
-#endif
+#include "ssh2-common.h"
 
 // Forward declaration
 class CHANNEL;

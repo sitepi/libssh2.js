@@ -30,11 +30,8 @@
 #include <cstring>
 #include <string>
 
+#include "ssh2-common.h"
 #include "ssh2-sftp-handle.h"
-
-#ifndef BUFF_LEN
-constexpr size_t BUFF_LEN = 4096;
-#endif
 
 class SFTP {
 public:
