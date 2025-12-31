@@ -1,87 +1,334 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
-<script src="../dist/libssh2.js"></script>
-<script>
-let libssh2;
-
-ssh2Loader().then((wasm) => {
-	libssh2 = wasm;
-	libssh2.init(0);
-	//connect();
-});
-
-let session;
-let has_opened  = false;
-let has_logined = false;
-
-function logs(msg) {
-	let log = document.getElementById('log');
-	log.innerText += (new Date()) + ' ' + msg + '\n';
-}
-
-function clean_logs() {
-	document.getElementById('log').innerText = '';
-}
-
-let ws;
-function connect()
-{
-	if(has_opened) {
-		ws.close();
-		delete ws;
-		has_opened = false;
-		document.getElementById('login').disabled = true;
-		document.getElementById('connect').value = 'connect';
-		logs('disconnected');
-		return;
-	}
-
-	const url = document.getElementById('url').value;
-	ws = new WebSocket(url);
-
-	session = libssh2.createSESSION(ws, ()=> {
-		logs('connected');
-
-		has_opened = true;
-		document.getElementById('login').disabled = false;
-		document.getElementById('connect').value = 'disconnect';
-		//login();
-	});
-}
-
-function login()
-{
-	let user  = document.getElementById('user').value;
-	let passwd= document.getElementById('passwd').value;
-
-	logs('fingerprint: ' + session.fingerprint());
-
-	session.login(user, passwd, (rc) => {
-		if(rc !== libssh2.ERROR.NONE) {
-			logs(rc + ' ' + libssh2.ERRMSG[rc]);
-		}
-		else {
-			has_logined = true;
-			logs(user + ' logined');
-		}
-	});
-}
-
-</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>libssh2.js - Exec Demo</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      color: #2D2E2C;
+      margin-bottom: 20px;
+    }
+    .connection-panel, .auth-panel, .command-panel {
+      background: white;
+      padding: 20px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .input-group {
+      margin-bottom: 15px;
+    }
+    .input-group label {
+      display: inline-block;
+      width: 100px;
+      font-weight: bold;
+    }
+    .input-group input[type="text"],
+    .input-group input[type="password"],
+    .input-group textarea {
+      width: calc(100% - 120px);
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    textarea {
+      font-family: 'Courier New', monospace;
+      resize: vertical;
+    }
+    button {
+      padding: 10px 20px;
+      background: #5DA5D5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+    }
+    button:hover:not(:disabled) {
+      background: #4A94C4;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    button.secondary {
+      background: #6c757d;
+    }
+    button.secondary:hover:not(:disabled) {
+      background: #5a6268;
+    }
+    #log {
+      background: #1e1e1e;
+      color: #00ff00;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+      min-height: 100px;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .status.connected {
+      background: #d4edda;
+      color: #155724;
+    }
+    .status.disconnected {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .error {
+      color: #ff4444;
+    }
+  </style>
+  <script src="../dist/libssh2.js"></script>
 </head>
 <body>
-url: 
-<input type='text' id='url' style='width: 600px' value='ws://127.0.0.1:7681/xxx' />
-<input type='button' onclick='connect()' id='connect' value='connect'/>
-<br/>
-user: <input type='text' id='user' value='pi'>
-passwd: <input type='text' id='passwd' value='raspberry'>
-<input type='button' onclick='login()' disabled id='login' value='login' />
-<br/>
-<hr/>
-<input type='button' onclick='clean_logs()' value='clean logs' />
-<div id='log'></div>
+  <h1>libssh2.js - Exec Demo</h1>
+  
+  <div class="connection-panel">
+    <h3>Connection <span id="status" class="status disconnected">Disconnected</span></h3>
+    <div class="input-group">
+      <label for="url">WebSocket:</label>
+      <input type="text" id="url" value="ws://127.0.0.1:7681/xxx" />
+    </div>
+    <button id="connect">Connect</button>
+  </div>
+
+  <div class="auth-panel">
+    <h3>Authentication</h3>
+    <div class="input-group">
+      <label for="user">Username:</label>
+      <input type="text" id="user" value="" placeholder="Enter username">
+    </div>
+    <div class="input-group">
+      <label for="passwd">Password:</label>
+      <input type="password" id="passwd" value="" placeholder="Enter password">
+    </div>
+    <button id="login" disabled>Login</button>
+  </div>
+
+  <div class="command-panel">
+    <h3>Execute Command</h3>
+    <div class="input-group">
+      <label for="command">Command:</label>
+      <textarea id="command" rows="3" placeholder="Enter command to execute (e.g., ls -la)">ls -la</textarea>
+    </div>
+    <button id="exec" disabled>Execute</button>
+  </div>
+
+  <div class="connection-panel">
+    <h3>Output</h3>
+    <button class="secondary" id="clearLog">Clear Log</button>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+
+      const elements = {
+        url: document.getElementById('url'),
+        user: document.getElementById('user'),
+        passwd: document.getElementById('passwd'),
+        command: document.getElementById('command'),
+        connectBtn: document.getElementById('connect'),
+        loginBtn: document.getElementById('login'),
+        execBtn: document.getElementById('exec'),
+        clearLogBtn: document.getElementById('clearLog'),
+        log: document.getElementById('log'),
+        status: document.getElementById('status')
+      };
+
+      let libssh2 = null;
+      let session = null;
+      let ws = null;
+      let connected = false;
+      let authenticated = false;
+
+      const log = (msg, isError = false) => {
+        const timestamp = new Date().toLocaleTimeString();
+        const className = isError ? ' class="error"' : '';
+        elements.log.innerHTML += `<span${className}>[${timestamp}] ${msg}</span>\n`;
+        elements.log.scrollTop = elements.log.scrollHeight;
+      };
+
+      const clearLog = () => {
+        elements.log.innerHTML = '';
+      };
+
+      const updateStatus = (isConnected) => {
+        connected = isConnected;
+        elements.status.textContent = isConnected ? 'Connected' : 'Disconnected';
+        elements.status.className = `status ${isConnected ? 'connected' : 'disconnected'}`;
+        elements.connectBtn.textContent = isConnected ? 'Disconnect' : 'Connect';
+        elements.loginBtn.disabled = !isConnected || authenticated;
+        elements.execBtn.disabled = !authenticated;
+      };
+
+      const connect = () => {
+        if (connected) {
+          if (ws) {
+            ws.close();
+            ws = null;
+          }
+          session = null;
+          authenticated = false;
+          updateStatus(false);
+          log('Disconnected');
+          return;
+        }
+
+        if (!libssh2) {
+          log('libssh2 not loaded yet, please wait...', true);
+          return;
+        }
+
+        const url = elements.url.value.trim();
+        if (!url) {
+          log('Please enter WebSocket URL', true);
+          return;
+        }
+
+        log(`Connecting to ${url}...`);
+        try {
+          ws = new WebSocket(url);
+          
+          ws.onerror = () => {
+            log('WebSocket connection failed', true);
+            updateStatus(false);
+          };
+
+          session = libssh2.createSESSION(ws, (rc, err) => {
+            if (rc !== libssh2.ERROR.NONE) {
+              log(`Connection error: ${rc} ${err || libssh2.ERRMSG[rc]}`, true);
+              updateStatus(false);
+              return;
+            }
+            log('Connected successfully');
+            log(`Fingerprint: ${session.fingerprint()}`);
+            updateStatus(true);
+          });
+        } catch (error) {
+          log(`Error: ${error.message}`, true);
+          updateStatus(false);
+        }
+      };
+
+      const login = () => {
+        const user = elements.user.value.trim();
+        const passwd = elements.passwd.value;
+
+        if (!user || !passwd) {
+          log('Please enter username and password', true);
+          return;
+        }
+
+        log(`Authenticating as ${user}...`);
+        elements.loginBtn.disabled = true;
+
+        session.login(user, passwd, (rc, msg) => {
+          if (rc !== libssh2.ERROR.NONE) {
+            log(`Authentication failed: ${rc} ${msg || libssh2.ERRMSG[rc]}`, true);
+            elements.loginBtn.disabled = false;
+            return;
+          }
+          authenticated = true;
+          log(`Authenticated as ${user}`);
+          elements.execBtn.disabled = false;
+          elements.loginBtn.disabled = true;
+        });
+      };
+
+      const executeCommand = () => {
+        const command = elements.command.value.trim();
+        if (!command) {
+          log('Please enter a command', true);
+          return;
+        }
+
+        log(`Executing: ${command}`);
+        elements.execBtn.disabled = true;
+
+        session.CHANNEL((rc, channel) => {
+          if (rc !== libssh2.ERROR.NONE) {
+            log(`Channel creation failed: ${rc}`, true);
+            elements.execBtn.disabled = false;
+            return;
+          }
+
+          let output = '';
+          channel.onmessage((rc, msg) => {
+            if (msg) {
+              output += msg;
+            }
+          });
+
+          channel.exec(command, (rc, msg) => {
+            if (rc !== libssh2.ERROR.NONE) {
+              log(`Exec failed: ${rc} ${msg}`, true);
+              elements.execBtn.disabled = false;
+              return;
+            }
+
+            // Wait for output
+            setTimeout(() => {
+              log('--- Output ---');
+              log(output || '(no output)');
+              log('--- End ---');
+              channel.close(() => {
+                elements.execBtn.disabled = false;
+              });
+            }, 500);
+          });
+        });
+      };
+
+      // Event listeners
+      elements.connectBtn.addEventListener('click', connect);
+      elements.loginBtn.addEventListener('click', login);
+      elements.execBtn.addEventListener('click', executeCommand);
+      elements.clearLogBtn.addEventListener('click', clearLog);
+
+      // Enter key shortcuts
+      elements.passwd.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !elements.loginBtn.disabled) {
+          login();
+        }
+      });
+
+      elements.command.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && e.ctrlKey && !elements.execBtn.disabled) {
+          executeCommand();
+        }
+      });
+
+      // Initialize libssh2
+      log('Loading libssh2...');
+      ssh2Loader().then((wasm) => {
+        libssh2 = wasm;
+        libssh2.init(0);
+        log('libssh2 loaded successfully');
+      }).catch((error) => {
+        log(`Failed to load libssh2: ${error.message}`, true);
+      });
+    })();
+  </script>
 </body>
 </html>
