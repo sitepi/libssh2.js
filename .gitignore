@@ -30,3 +30,31 @@
 *.exe
 *.out
 *.app
+# Build directory
+build/
+
+# Dependencies source
+deps/builds/
+
+# Node modules
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Emscripten cache
+emsdk-cache/
+
+# Keep dist directory (don't ignore it)
+!dist/

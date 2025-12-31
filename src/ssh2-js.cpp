@@ -29,46 +29,60 @@
 #include "ssh2-sftp.h"
 #include "ssh2-sftp-handle.h"
 
-static bool _init = false;
+static bool g_libssh2_initialized = false;
 
+/**
+ * Initialize libssh2 library
+ * @param flags - initialization flags for libssh2
+ * @return 0 on success, error code on failure
+ */
 static int ssh2_init(int flags)
 {
-	if(_init)
+	if (g_libssh2_initialized) {
 		return 0;
-
-	int rc = libssh2_init(flags);
-	_init = (rc) ? false: true;
-	#if 0
-	if(_init) {
-		printf("libssh2-%s loaded\n", libssh2_version(0));
 	}
-	#endif
+
+	const int rc = libssh2_init(flags);
+	if (rc == 0) {
+		g_libssh2_initialized = true;
+	}
 	return rc;
 }
 
+/**
+ * Cleanup and exit libssh2 library
+ */
 static void ssh2_exit()
 {
+	if (!g_libssh2_initialized) {
+		return;
+	}
+
 	libssh2_exit();
-	_init = false;
-	//printf("libssh2-%s exit\n", libssh2_version(0));
+	g_libssh2_initialized = false;
 }
 
+/**
+ * Get libssh2 version string
+ * @return version string
+ */
 static std::string ssh2_version()
 {
-	return std::string(libssh2_version(0));
+	const char* ver = libssh2_version(0);
+	return ver ? std::string(ver) : "";
 }
 
-// Binding code
+// Emscripten bindings for libssh2.js
 EMSCRIPTEN_BINDINGS(libssh2_js) {
+	// Library initialization and management
 	emscripten::function("init", &ssh2_init);
 	emscripten::function("exit", &ssh2_exit);
 	emscripten::function("version", &ssh2_version);
 
+	// CHANNEL class - SSH channel operations
 	emscripten::class_<CHANNEL>("_CHANNEL")
 		.constructor<emscripten::val>()
-
 		.property("active", &CHANNEL::getActive)
-
 		.function("close", &CHANNEL::close)
 		.function("eof", &CHANNEL::eof)
 		.function("exec", &CHANNEL::exec)
@@ -84,6 +98,7 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 		.function("x11_req", &CHANNEL::x11_req)
 		;
 
+	// SFTP file attributes structure
 	emscripten::value_object<LIBSSH2_SFTP_ATTRIBUTES>("attrs")
 		.field("flags", &LIBSSH2_SFTP_ATTRIBUTES::flags)
 		.field("filesize", &LIBSSH2_SFTP_ATTRIBUTES::filesize)
@@ -92,8 +107,9 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 		.field("perm", &LIBSSH2_SFTP_ATTRIBUTES::permissions)
 		.field("atime", &LIBSSH2_SFTP_ATTRIBUTES::atime)
 		.field("mtime", &LIBSSH2_SFTP_ATTRIBUTES::mtime)
-
 		;
+	
+	// SFTP filesystem statistics structure
 	emscripten::value_object<LIBSSH2_SFTP_STATVFS>("statvfs")
 		.field("bsize", &LIBSSH2_SFTP_STATVFS::f_bsize)
 		.field("frsize", &LIBSSH2_SFTP_STATVFS::f_frsize)
@@ -108,12 +124,11 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 		.field("namemax", &LIBSSH2_SFTP_STATVFS::f_namemax)
 		;
 
+	// SFTP_HANDLE class - SFTP file/directory handle operations
 	emscripten::class_<SFTP_HANDLE>("_SFTP_HANDLE")
 		.constructor<emscripten::val>()
-
 		.property("active", &SFTP_HANDLE::getActive)
 		.property("error", &SFTP_HANDLE::getError)
-
 		.function("close", &SFTP_HANDLE::close)
 		.function("closedir", &SFTP_HANDLE::closedir)
 		.function("fsetstat", &SFTP_HANDLE::fsetstat)
@@ -131,12 +146,11 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 		.function("write", &SFTP_HANDLE::write)
 		;
 
+	// SFTP class - SFTP subsystem operations
 	emscripten::class_<SFTP>("_SFTP")
 		.constructor<emscripten::val>()
-
 		.property("active", &SFTP::getActive)
 		.property("error", &SFTP::getError)
-
 		.function("lstat", &SFTP::lstat)
 		.function("mkdir", &SFTP::mkdir)
 		.function("open", &SFTP::open)
@@ -153,13 +167,12 @@ EMSCRIPTEN_BINDINGS(libssh2_js) {
 		.function("unlink", &SFTP::unlink)
 		;
 
+	// SESSION class - SSH session management
 	emscripten::class_<SESSION>("_SESSION")
 		.constructor<emscripten::val>()
-
 		.property("fingerprint", &SESSION::getFingerprint)
 		.property("send", &SESSION::getSendCb, &SESSION::setSendCb)
 		.property("error", &SESSION::getError)
-
 		.function("pushdata", &SESSION::pushdata)
 		.function("userauth", &SESSION::userauth)
 		.function("login", &SESSION::login)

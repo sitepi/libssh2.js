@@ -1,0 +1,204 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '3.1.50'
+          actions-cache-folder: 'emsdk-cache'
+          
+      - name: Verify Emscripten installation
+        run: |
+          emcc --version
+          em++ --version
+          
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            deps/lib
+            deps/include
+            deps/builds
+          key: ${{ runner.os }}-deps-${{ hashFiles('deps/BUILD.md') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-
+            
+      - name: Download dependencies
+        working-directory: deps
+        run: |
+          mkdir -p builds && cd builds
+          
+          # Download if not exists
+          if [ ! -f "zlib-1.2.11.tar.gz" ]; then
+            echo "Downloading zlib..."
+            wget -q https://www.zlib.net/zlib-1.2.11.tar.gz
+          fi
+          
+          if [ ! -f "mbedtls-v2.27.0.zip" ]; then
+            echo "Downloading mbedtls..."
+            wget -q https://github.com/ARMmbed/mbedtls/archive/refs/tags/v2.27.0.zip -O mbedtls-v2.27.0.zip
+          fi
+          
+          if [ ! -f "libssh2-1.10.0.tar.gz" ]; then
+            echo "Downloading libssh2..."
+            wget -q https://www.libssh2.org/download/libssh2-1.10.0.tar.gz
+          fi
+          
+      - name: Extract dependencies
+        working-directory: deps/builds
+        run: |
+          echo "Extracting dependencies..."
+          [ ! -d "zlib-1.2.11" ] && tar -zxf zlib-1.2.11.tar.gz || echo "zlib already extracted"
+          [ ! -d "mbedtls-2.27.0" ] && unzip -q mbedtls-v2.27.0.zip || echo "mbedtls already extracted"
+          [ ! -d "libssh2-1.10.0" ] && tar -zxf libssh2-1.10.0.tar.gz || echo "libssh2 already extracted"
+          
+      - name: Build zlib
+        working-directory: deps/builds/zlib-1.2.11
+        run: |
+          if [ ! -f "${GITHUB_WORKSPACE}/deps/lib/libz.a" ]; then
+            echo "Building zlib..."
+            export EMPORTS="${GITHUB_WORKSPACE}/deps"
+            emconfigure ./configure --static --prefix=${EMPORTS}
+            emmake make -j$(nproc)
+            emmake make install
+          else
+            echo "zlib already built, skipping..."
+          fi
+          
+      - name: Build mbedtls
+        working-directory: deps/builds/mbedtls-2.27.0
+        run: |
+          if [ ! -f "${GITHUB_WORKSPACE}/deps/lib/libmbedtls.a" ]; then
+            echo "Building mbedtls..."
+            export EMPORTS="${GITHUB_WORKSPACE}/deps"
+            mkdir -p build && cd build
+            emcmake cmake .. \
+              -DMBEDTLS_FATAL_WARNINGS=OFF \
+              -DENABLE_TESTING=OFF \
+              -DENABLE_PROGRAMS=OFF \
+              -DENABLE_ZLIB_SUPPORT=ON \
+              -DZLIB_LIBRARY=${EMPORTS}/lib \
+              -DZLIB_INCLUDE_DIR=${EMPORTS}/include \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=${EMPORTS}
+            emmake make -j$(nproc)
+            emmake make install
+          else
+            echo "mbedtls already built, skipping..."
+          fi
+          
+      - name: Build libssh2
+        working-directory: deps/builds/libssh2-1.10.0
+        run: |
+          if [ ! -f "${GITHUB_WORKSPACE}/deps/lib/libssh2.a" ]; then
+            echo "Building libssh2..."
+            export EMPORTS="${GITHUB_WORKSPACE}/deps"
+            mkdir -p build && cd build
+            emcmake cmake .. \
+              -DBUILD_SHARED_LIBS=OFF \
+              -DCRYPTO_BACKEND=mbedTLS \
+              -DENABLE_ZLIB_COMPRESSION=ON \
+              -DENABLE_DEBUG_LOGGING=OFF \
+              -DCLEAR_MEMORY=ON \
+              -DBUILD_EXAMPLES=OFF \
+              -DBUILD_TESTING=OFF \
+              -DZLIB_LIBRARY=${EMPORTS}/lib \
+              -DZLIB_INCLUDE_DIR=${EMPORTS}/include \
+              -DMBEDTLS_INCLUDE_DIR=${EMPORTS}/include \
+              -DMBEDTLS_LIBRARY=${EMPORTS}/lib \
+              -DMBEDX509_LIBRARY=${EMPORTS}/lib \
+              -DMBEDCRYPTO_LIBRARY=${EMPORTS}/lib \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=${EMPORTS}
+            emmake make -j$(nproc)
+            emmake make install
+          else
+            echo "libssh2 already built, skipping..."
+          fi
+          
+      - name: Build libssh2.js
+        run: |
+          echo "Building libssh2.js..."
+          mkdir -p build && cd build
+          emcmake cmake ..
+          emmake make -j$(nproc)
+          
+      - name: Prepare dist directory
+        run: |
+          echo "Preparing dist directory..."
+          mkdir -p dist
+          
+          # Copy compiled files
+          if [ -f "build/libssh2.js" ]; then
+            cp build/libssh2.js dist/
+          fi
+          
+          if [ -f "build/libssh2.wasm" ]; then
+            cp build/libssh2.wasm dist/
+          fi
+          
+          # Copy JS wrapper files
+          if [ -d "js" ]; then
+            cp -r js/* dist/
+          fi
+          
+          # List dist contents
+          echo "Dist directory contents:"
+          ls -lah dist/
+          
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libssh2-js-dist
+          path: dist/
+          retention-days: 30
+          
+      - name: Commit and push to dist directory
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Add dist files
+          git add -f dist/
+          
+          # Check if there are changes
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "🤖 Auto-build: Update dist files [skip ci]"
+            git push
+          fi
+          
+      - name: Create Release on Tag
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/libssh2.js
+            dist/libssh2.wasm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

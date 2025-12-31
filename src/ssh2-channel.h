@@ -27,198 +27,258 @@
 #include <libssh2_sftp.h>
 
 #include <emscripten/bind.h>
+#include <cstring>
+#include <cstdio>
+#include <array>
 
-#define BUFF_LEN 4096
+#ifndef BUFF_LEN
+constexpr size_t BUFF_LEN = 4096;
+#endif
 
-static char sshost[64];
-static int ssport = 0;
+// Forward declaration
+class CHANNEL;
+
+// X11 callback data structure
+struct X11Data {
+	char shost[64] = {0};
+	int sport = 0;
+};
+
 /*
- * CallBack to initialize the forwarding.
+ * Callback to initialize the X11 forwarding.
  * Save the channel to loop on it, save the X11 forwarded socket to send
  * and receive info from our X server.
  */
 static void x11_callback(LIBSSH2_SESSION *session, LIBSSH2_CHANNEL *channel,
                          char *shost, int sport, void **abstract)
 {
-	fprintf(stderr, "shost: %s, sport: %d\r\n", shost, sport);
-	strcpy(sshost, shost);
-	ssport = sport;
+	if (abstract && *abstract) {
+		X11Data* data = static_cast<X11Data*>(*abstract);
+		snprintf(data->shost, sizeof(data->shost), "%s", shost);
+		data->sport = sport;
+		fprintf(stderr, "X11: shost=%s, sport=%d\r\n", shost, sport);
+	}
 }
 
 class CHANNEL {
 public:
 	CHANNEL(emscripten::val v)
+		: session(nullptr)
+		, channel(nullptr)
+		, active(false)
+		, error(0)
 	{
-
+		// Empty binding constructor
 	}
 
-	CHANNEL(LIBSSH2_SESSION *sess, LIBSSH2_CHANNEL *ch) :
-			session(sess),
-			channel(ch),
-			active(false)
+	CHANNEL(LIBSSH2_SESSION* sess, LIBSSH2_CHANNEL* ch)
+		: session(sess)
+		, channel(ch)
+		, active(ch != nullptr)
+		, error(0)
 	{
-		if(channel) {
-			active = true;
+		std::memset(buffer, 0, sizeof(buffer));
+	}
+
+	// Destructor to ensure proper cleanup
+	~CHANNEL() {
+		if (active && channel) {
+			libssh2_channel_close(channel);
+			libssh2_channel_free(channel);
 		}
+	}
+
+	// Disable copy, enable move
+	CHANNEL(const CHANNEL&) = delete;
+	CHANNEL& operator=(const CHANNEL&) = delete;
+	CHANNEL(CHANNEL&& other) noexcept
+		: session(other.session)
+		, channel(other.channel)
+		, active(other.active)
+		, error(other.error)
+		, x11_data(other.x11_data)
+	{
+		std::memcpy(buffer, other.buffer, sizeof(buffer));
+		other.channel = nullptr;
+		other.active = false;
+	}
+	CHANNEL& operator=(CHANNEL&& other) noexcept {
+		if (this != &other) {
+			if (active && channel) {
+				libssh2_channel_close(channel);
+				libssh2_channel_free(channel);
+			}
+			session = other.session;
+			channel = other.channel;
+			active = other.active;
+			error = other.error;
+			x11_data = other.x11_data;
+			std::memcpy(buffer, other.buffer, sizeof(buffer));
+			other.channel = nullptr;
+			other.active = false;
+		}
+		return *this;
 	}
 
 	int close() 
 	{
-		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
-		if(active) {
-			rc = libssh2_channel_close(channel);
-			if(!rc) {
-				libssh2_channel_free(channel);
-				channel = NULL;
-				active = false;
-			}
+		if (!active) {
+			return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		}
+
+		const int rc = libssh2_channel_close(channel);
+		if (rc == 0) {
+			libssh2_channel_free(channel);
+			channel = nullptr;
+			active = false;
 		}
 		return rc;
 	}
 
-	int eof() 
-	{
-		if(active) {
-			return libssh2_channel_eof(channel);
-		}
-		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+private:
+	// Helper to check if channel is active
+	inline bool checkActive() const noexcept {
+		return active && channel != nullptr;
 	}
 
-	int exec(std::string cmd) 
+	// Helper to set error and return result
+	inline int setError(int rc) noexcept {
+		error = (rc < 0) ? libssh2_session_last_errno(session) : 0;
+		return rc;
+	}
+
+public:
+	int eof() const
 	{
-		if(active) {
-			return libssh2_channel_exec(channel, cmd.c_str());
+		return checkActive() ? libssh2_channel_eof(channel) 
+		                     : LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+	}
+
+	int exec(const std::string& cmd) 
+	{
+		if (!checkActive()) {
+			return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		}
-		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		return setError(libssh2_channel_exec(channel, cmd.c_str()));
 	}
 
 	int flush() 
 	{
-		if(active) {
-			return libssh2_channel_flush(channel);
-		}
-		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		return checkActive() ? libssh2_channel_flush(channel) 
+		                     : LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 	}
 
 	std::string read()
 	{
-		int n = 0;
-		if(active) {
-			if(ssport != 0) {
-				n = sprintf(buffer, "{\"shost\":\"%s\",\"sport\":%d}", sshost, ssport);
-				error = 0;
-			}
-			else {
-			n = libssh2_channel_read(channel, buffer, BUFF_LEN);
-			error = (n < 0) ? libssh2_session_last_errno(session) : 0;
-			}
-		}
-		else {
+		if (!checkActive()) {
 			error = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+			return "";
 		}
-		return (n>0) ? std::string(buffer, n) : nodata;
+
+		// Check if we have X11 forwarding data to return
+		if (x11_data.sport != 0) {
+			// Optimize: Calculate exact size needed
+			std::string result;
+			result.reserve(128); // Reserve enough for JSON
+			const int n = snprintf(buffer, BUFF_LEN, 
+			                      "{\"shost\":\"%s\",\"sport\":%d}", 
+			                      x11_data.shost, x11_data.sport);
+			x11_data.sport = 0; // Reset after reading
+			error = 0;
+			if (n > 0) {
+				result.assign(buffer, static_cast<size_t>(n));
+			}
+			return result;
+		}
+
+		const ssize_t n = libssh2_channel_read(channel, buffer, BUFF_LEN);
+		error = (n < 0) ? libssh2_session_last_errno(session) : 0;
+		// Optimize: Avoid string construction if no data
+		return (n > 0) ? std::string(buffer, static_cast<size_t>(n)) : std::string();
 	}
 
 	std::string read_err()
 	{
-		ssize_t n = 0;
-		if(active) {
-			n=libssh2_channel_read_stderr(channel, buffer, BUFF_LEN);
-			error = (n < 0) ? libssh2_session_last_errno(session) : 0;
-		}
-		else {
+		if (!checkActive()) {
 			error = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+			return std::string();
 		}
-		return (n>0) ? std::string(buffer, n) : nodata;
+
+		const ssize_t n = libssh2_channel_read_stderr(channel, buffer, BUFF_LEN);
+		error = (n < 0) ? libssh2_session_last_errno(session) : 0;
+		return (n > 0) ? std::string(buffer, static_cast<size_t>(n)) : "";
 	}
 
-	int pty(std::string term) 
+	int pty(const std::string& term) 
 	{
-		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
-		if(active) {
-			rc = libssh2_channel_request_pty(channel, term.c_str());
+		if (!checkActive()) {
+			return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		}
-
-		return rc;
+		return libssh2_channel_request_pty(channel, term.c_str());
 	}
 
 	int pty_size(int width, int height) 
 	{
-		if(active) {
-			return libssh2_channel_request_pty_size(channel, 
-					width, height);
-		}
-		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		return checkActive() ? libssh2_channel_request_pty_size(channel, width, height)
+		                     : LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 	}
 
 	int x11_req(int screen) 
 	{
-		libssh2_session_callback_set(session, LIBSSH2_CALLBACK_X11,
-						(void *)x11_callback);
-
-		int rc = LIBSSH2_ERROR_CHANNEL_UNKNOWN;
-		if(active) {
-			rc = libssh2_channel_x11_req(channel, screen);
+		if (!checkActive()) {
+			return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		}
 
-		return rc;
+		// Set callback with our X11 data as abstract pointer
+		libssh2_session_callback_set(session, LIBSSH2_CALLBACK_X11,
+						        reinterpret_cast<void*>(x11_callback));
+
+		return libssh2_channel_x11_req_ex(channel, 0, nullptr, nullptr, screen);
 	}
 
-	int setenv(std::string name, std::string value)
+	int setenv(const std::string& name, const std::string& value)
 	{
-		if(active) {
-			return libssh2_channel_setenv(channel, 
-					name.c_str(), value.c_str());
-		}
-		
-		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		return checkActive() ? libssh2_channel_setenv(channel, name.c_str(), value.c_str())
+		                     : LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 	}
 
 	int shell() 
 	{
-		if(active) {
-			return libssh2_channel_shell(channel);
-		}
-		
-		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		return checkActive() ? libssh2_channel_shell(channel)
+		                     : LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 	}
 
-	int write(std::string cmd)
+	int write(const std::string& cmd)
 	{
-		if(active) {
-			return libssh2_channel_write(channel, 
-					cmd.c_str(),cmd.length());
+		if (!checkActive()) {
+			return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		}
-
-		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		return libssh2_channel_write(channel, cmd.data(), cmd.length());
 	}
 
-	int write_err(std::string cmd)
+	int write_err(const std::string& cmd)
 	{
-		if(active) {
-			return libssh2_channel_write_stderr(channel,
-					cmd.c_str(),  cmd.length());
+		if (!checkActive()) {
+			return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
 		}
-		return LIBSSH2_ERROR_CHANNEL_UNKNOWN;
+		return libssh2_channel_write_stderr(channel, cmd.data(), cmd.length());
 	}
 
-	bool getActive() const {
+	bool getActive() const noexcept {
 		return active;
 	}
 
-	bool getError() const {
+	int getError() const noexcept {
 		return error;
 	}
 
 private:
-	LIBSSH2_SESSION *session = NULL;
-	LIBSSH2_CHANNEL *channel = NULL;
-
-	char buffer[BUFF_LEN];
-	std::string nodata;
-
+	LIBSSH2_SESSION* session = nullptr;
+	LIBSSH2_CHANNEL* channel = nullptr;
+	char buffer[BUFF_LEN] = {0};
 	bool active = false;
 	int error = 0;
+	X11Data x11_data;
 };
 
 #endif /* ~_SSH2_CHANNEL_H_ */

@@ -1,20 +1,20 @@
 /**
- * libssh2.js - LibSSH2 Over Stream (WebSocket|WebRTC|Socket) in browsers or Node.js
+ * libssh2.js - ES Module Entry Point
+ * LibSSH2 Over Stream (WebSocket|WebRTC|Socket) in browsers or Node.js
  * 
- * @module libssh2.js
+ * @module libssh2.js/esm
  * @version 0.1.0
  * @license MIT
  */
 
-// Import the WASM loader and wrapper
-const ssh2Loader = require('./js/libssh2-wrapper.js');
+import ssh2Loader from './js/libssh2-wrapper.js';
 
 /**
  * Initialize libssh2 library
  * @param {Object} wasmModule - The compiled WASM module
  * @returns {Promise<Object>} Initialized SSH2 library instance
  */
-async function init(wasmModule) {
+export async function init(wasmModule) {
   if (!wasmModule) {
     throw new Error('WASM module is required');
   }
@@ -29,18 +29,11 @@ async function init(wasmModule) {
     CHANNEL: ssh2Loader.CHANNEL,
     createSession: ssh2Loader.createSESSION,
     version: ssh2.version,
-    
-    // Convenience aliases
     createSSH: ssh2Loader.createSESSION,
   };
 }
 
-// CommonJS export
-module.exports = init;
-module.exports.default = init;
+// Re-export constants for direct import
+export { ERROR, ERRMSG, SFTP, CHANNEL } from './js/libssh2-wrapper.js';
 
-// ES6 named exports for better tree-shaking
-module.exports.ERROR = ssh2Loader.ERROR;
-module.exports.SFTP = ssh2Loader.SFTP;
-module.exports.CHANNEL = ssh2Loader.CHANNEL;
-
+export default init;

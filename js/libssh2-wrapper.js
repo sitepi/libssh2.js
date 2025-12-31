@@ -24,6 +24,124 @@ const nocb = (rc, msg) => {
 	console.log(rc, msg);
 }
 
+/**
+ * Modern async helper to handle EAGAIN retries with backoff
+ * @param {Function} operation - The operation to execute (returns result or error code)
+ * @param {Object} options - Configuration options
+ * @param {number} options.initialDelay - Initial retry delay in ms (default: 10)
+ * @param {number} options.maxDelay - Maximum retry delay in ms (default: 100)
+ * @param {number} options.timeout - Timeout in ms (default: 30000)
+ * @param {number} options.backoffFactor - Backoff multiplier (default: 1.5)
+ * @returns {Promise} Promise that resolves with operation result
+ */
+const retryOnEagain = async (operation, options = {}) => {
+	const {
+		initialDelay = 10,
+		maxDelay = 100,
+		timeout = 30000,
+		backoffFactor = 1.5
+	} = options;
+
+	const startTime = Date.now();
+	let delay = initialDelay;
+	let abortController = null;
+
+	const sleep = (ms) => new Promise(resolve => {
+		const timeoutId = setTimeout(resolve, ms);
+		if (abortController) {
+			abortController.signal.addEventListener('abort', () => {
+				clearTimeout(timeoutId);
+				resolve();
+			});
+		}
+	});
+
+	while (true) {
+		// Check timeout
+		if (Date.now() - startTime >= timeout) {
+			throw {
+				code: ERROR.TIMEOUT,
+				message: 'Operation timeout'
+			};
+		}
+
+		// Execute operation
+		const result = operation();
+		
+		// Handle different result types
+		if (typeof result === 'object' && result !== null) {
+			// Result is {code, message} or {code, data}
+			const code = result.code ?? result.rc ?? result;
+			
+			if (code === ERROR.NONE || code === 0) {
+				return result;
+			} else if (code !== ERROR.EAGAIN) {
+				throw result;
+			}
+		} else {
+			// Result is just a code number
+			if (result === ERROR.NONE || result === 0) {
+				return { code: result, message: ERRMSG[result] };
+			} else if (result !== ERROR.EAGAIN) {
+				throw { code: result, message: ERRMSG[result] };
+			}
+		}
+
+		// EAGAIN: wait before retry with exponential backoff
+		await sleep(delay);
+		delay = Math.min(delay * backoffFactor, maxDelay);
+	}
+};
+
+/**
+ * Simplified async helper for operations without complex retry logic
+ * @param {Function} operation - The operation to execute
+ * @param {Object} errorContext - Optional error context (e.g., handle object)
+ * @returns {Promise} Promise that resolves with operation result
+ */
+const asyncOp = async (operation, errorContext = null) => {
+	return retryOnEagain(() => {
+		const result = operation();
+		const code = errorContext ? errorContext.error : (result?.code ?? result);
+		
+		if (typeof result === 'object' && result !== null && !('code' in result)) {
+			// Result is data, get error from context
+			return {
+				code: code,
+				data: result,
+				message: ERRMSG[code]
+			};
+		}
+		
+		return {
+			code: code,
+			data: result,
+			message: ERRMSG[code]
+		};
+	});
+};
+
+/**
+ * Convert callback-style or promise-style function
+ * @param {Function} asyncFn - Async function to wrap
+ * @returns {Function} Function that accepts optional callback
+ */
+const callbackOrPromise = (asyncFn) => {
+	return function(_cb) {
+		const isCallback = typeof _cb === 'function';
+		
+		if (isCallback) {
+			// Callback style
+			asyncFn()
+				.then(result => _cb(result.code ?? 0, result.data ?? result.message))
+				.catch(error => _cb(error.code ?? -1, error.message ?? 'Unknown error'));
+		} else {
+			// Promise style
+			return asyncFn();
+		}
+	};
+};
+
 const ERROR = {
 	NONE:         0,
 	SOCKET_NONE: -1,
@@ -207,31 +325,31 @@ const SFTP = {
 	 * These is used in "permissions" of "struct _LIBSSH2_SFTP_ATTRIBUTES"
 	 */
 		/* File type */
-		S_IFMT:         0170000,     /* type of file mask */
-		S_IFIFO:        0010000,     /* named pipe (fifo) */
-		S_IFCHR:        0020000,     /* character special */
-		S_IFDIR:        0040000,     /* directory */
-		S_IFBLK:        0060000,     /* block special */
-		S_IFREG:        0100000,     /* regular */
-		S_IFLNK:        0120000,     /* symbolic link */
-		S_IFSOCK:       0140000,     /* socket */
+		S_IFMT:         0o170000,    /* type of file mask */
+		S_IFIFO:        0o010000,    /* named pipe (fifo) */
+		S_IFCHR:        0o020000,    /* character special */
+		S_IFDIR:        0o040000,    /* directory */
+		S_IFBLK:        0o060000,    /* block special */
+		S_IFREG:        0o100000,    /* regular */
+		S_IFLNK:        0o120000,    /* symbolic link */
+		S_IFSOCK:       0o140000,    /* socket */
 
 		/* File mode */
 		/* Read, write, execute/search by owner */
-		S_IRWXU:        0000700,     /* RWX mask for owner */
-		S_IRUSR:        0000400,     /* R for owner */
-		S_IWUSR:        0000200,     /* W for owner */
-		S_IXUSR:        0000100,     /* X for owner */
+		S_IRWXU:        0o000700,    /* RWX mask for owner */
+		S_IRUSR:        0o000400,    /* R for owner */
+		S_IWUSR:        0o000200,    /* W for owner */
+		S_IXUSR:        0o000100,    /* X for owner */
 		/* Read, write, execute/search by group */
-		S_IRWXG:        0000070,     /* RWX mask for group */
-		S_IRGRP:        0000040,     /* R for group */
-		S_IWGRP:        0000020,     /* W for group */
-		S_IXGRP:        0000010,     /* X for group */
+		S_IRWXG:        0o000070,    /* RWX mask for group */
+		S_IRGRP:        0o000040,    /* R for group */
+		S_IWGRP:        0o000020,    /* W for group */
+		S_IXGRP:        0o000010,    /* X for group */
 		/* Read, write, execute/search by others */
-		S_IRWXO:        0000007,     /* RWX mask for other */
-		S_IROTH:        0000004,     /* R for other */
-		S_IWOTH:        0000002,     /* W for other */
-		S_IXOTH:        0000001     /* X for other */
+		S_IRWXO:        0o000007,    /* RWX mask for other */
+		S_IROTH:        0o000004,    /* R for other */
+		S_IWOTH:        0o000002,    /* W for other */
+		S_IXOTH:        0o000001     /* X for other */
 	},
 
 	FLAGS: {
@@ -308,293 +426,77 @@ const sftp_handle = function(_h, _isdir) {
 	var st    = {};
 
 	const 
-	close = function(_cb) {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc = (isdir) ? h.closedir() : h.close();
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	fsetstat = function(_cb) {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
+	close = callbackOrPromise(async () => {
+		return asyncOp(() => isdir ? h.closedir() : h.close());
+	}),
+	
+	fsetstat = callbackOrPromise(async () => {
+		return asyncOp(() => {
 			const msg = h.fsetstat();
-			const rc  = h.error;
-			if(rc == ERROR.NONE) {
-				res(rc, msg);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	fstat = function(_cb) {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const msg = h.fstat();
-			const rc  = h.error;
-			if(rc == ERROR.NONE) {
-				res(rc, msg);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	fstatvfs = function(_cb) {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const msg = h.fstatvfs();
-			const rc  = h.error;
-			if(rc == ERROR.NONE) {
-				res(rc, msg);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	fsync = function(_cb) {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc = h.fsync();
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	read = function(_cb) {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const msg = h.read();
-			const rc  = 0;
-			if(rc == ERROR.NONE) {
-				res(rc, msg);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	readdir = function(_cb) {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const msg = h.readdir();
-			const rc  = 0;
-			if(rc == ERROR.NONE) {
-				res(rc, msg);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	rewind = function(_cb) {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc = h.rewind();
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	seek = function(offset, _cb) {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc = h.seek(offset);
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	seek64 = function(offset, _cb) {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc = h.seek64(offset);
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	shutdown = function(_cb) {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc = h.shutdown();
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	tell = function(_cb) {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc = h.tell();
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	tell64 = function(_cb) {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc = h.tell64();
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	write = function(buffer, _cb) {
-		const cb = (typeof(_cb) === 'function') ? _cb : nocb;
-		return new Promise((resolve, reject) => {
-			const n = h.write(buffer);
-			const rc = 0;
-			cb(rc, ERRMSG[rc]);
-			resolve(rc);
+			return { code: h.error, data: msg };
 		});
-	}
+	}),
+	
+	fstat = callbackOrPromise(async () => {
+		return asyncOp(() => {
+			const msg = h.fstat();
+			return { code: h.error, data: msg };
+		});
+	}),
+	
+	fstatvfs = callbackOrPromise(async () => {
+		return asyncOp(() => {
+			const msg = h.fstatvfs();
+			return { code: h.error, data: msg };
+		});
+	}),
+	
+	fsync = callbackOrPromise(async () => {
+		return asyncOp(() => h.fsync());
+	}),
+	
+	read = callbackOrPromise(async () => {
+		return asyncOp(() => {
+			const msg = h.read();
+			return { code: 0, data: msg };
+		});
+	}),
+	
+	readdir = callbackOrPromise(async () => {
+		return asyncOp(() => {
+			const msg = h.readdir();
+			return { code: 0, data: msg };
+		});
+	}),
+	
+	rewind = callbackOrPromise(async () => {
+		return asyncOp(() => h.rewind());
+	}),
+	
+	seek = (offset, _cb) => callbackOrPromise(async () => {
+		return asyncOp(() => h.seek(offset));
+	})(_cb),
+	
+	seek64 = (offset, _cb) => callbackOrPromise(async () => {
+		return asyncOp(() => h.seek64(offset));
+	})(_cb),
+	
+	shutdown = callbackOrPromise(async () => {
+		return asyncOp(() => h.shutdown());
+	}),
+	
+	tell = callbackOrPromise(async () => {
+		return asyncOp(() => h.tell());
+	}),
+	
+	tell64 = callbackOrPromise(async () => {
+		return asyncOp(() => h.tell64());
+	}),
+	
+	write = (buffer, _cb) => callbackOrPromise(async () => {
+		const n = h.write(buffer);
+		return { code: 0, data: n, message: ERRMSG[0] };
+	})(_cb)
 	;
 
 	return (isdir) ?
@@ -622,328 +524,104 @@ const sftp = (_sf) => {
 	const sf = _sf || { active: false };
 
 	const
-	lstat = (path, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
+	lstat = (path, _cb) => callbackOrPromise(async () => {
+		return asyncOp(() => {
 			const attrs = sf.lstat(path);
-			const rc    = sf.error;
-			if(rc == ERROR.NONE) {
-				res(rc, attrs);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	mkdir = (path, mode, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc = sf.mkdir(path, mode);
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	open = (path, flags, mode, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
+			return { code: sf.error, data: attrs };
+		});
+	})(_cb),
+	mkdir = (path, mode, _cb) => callbackOrPromise(async () => {
+		return asyncOp(() => sf.mkdir(path, mode));
+	})(_cb),
+	open = (path, flags, mode, _cb) => callbackOrPromise(async () => {
 		const type = SFTP.OPENFILE;
-
-		var h;
-		const _async = () => {
-
-			if(typeof(h) === 'undefined') {
-				h = sf.open(path, flags, mode, type);
-			}
-			else if(!h.active) {
+		let h;
+		
+		return retryOnEagain(() => {
+			if (!h || !h.active) {
 				h = sf.open(path, flags, mode, type);
 			}
 			
 			const rc = sf.error;
-			if(h.active) {
-				res(rc, sftp_handle(h));
+			if (h.active) {
+				return { code: rc, data: sftp_handle(h) };
+			} else if (rc !== ERROR.EAGAIN) {
+				throw { code: rc, message: ERRMSG[rc] };
 			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	opendir = (path, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
+			return { code: ERROR.EAGAIN };
+		});
+	})(_cb),
+	opendir = (path, _cb) => callbackOrPromise(async () => {
+		let h;
 		
-		var h;
-		const _async = () => {
-			if(typeof(h) === 'undefined') {
-				h = sf.opendir(path);
-			}
-			else if(!h.active) {
+		return retryOnEagain(() => {
+			if (!h || !h.active) {
 				h = sf.opendir(path);
 			}
 
 			const rc = sf.error;
-			if(h.active) {
-				res(rc, sftp_handle(h, true));
+			if (h.active) {
+				return { code: rc, data: sftp_handle(h, true) };
+			} else if (rc !== ERROR.EAGAIN) {
+				throw { code: rc, message: ERRMSG[rc] };
 			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	readlink = (path, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
+			return { code: ERROR.EAGAIN };
+		});
+	})(_cb),
+	readlink = (path, _cb) => callbackOrPromise(async () => {
+		return asyncOp(() => {
 			const msg = sf.readlink(path);
-			const rc  = sf.error;
-			if(rc == ERROR.NONE) {
-				res(rc, msg);
-			}
-			else if (rc !== ERROR.EAGAIN) {
+			const rc = sf.error;
+			if (rc === ERROR.NONE) {
+				return { code: rc, data: msg };
+			} else if (rc !== ERROR.EAGAIN) {
 				const err = (rc === ERROR.SFTP_PROTOCOL) ? ERRMSG[rc] : SFTP.STATMSG[rc];
-				rej(rc, err);
+				throw { code: rc, message: err };
 			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
+			return { code: ERROR.EAGAIN };
+		});
+	})(_cb),
 
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-
-	unlink = (path, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc  = sf.unlink(path);
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	realpath = (path, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
+	unlink = (path, _cb) => callbackOrPromise(async () => {
+		return asyncOp(() => sf.unlink(path));
+	})(_cb),
+	realpath = (path, _cb) => callbackOrPromise(async () => {
+		return asyncOp(() => {
 			const msg = sf.realpath(path);
-			const rc  = sf.error;
-			if(rc == ERROR.NONE) {
-				return res(rc, msg);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				return rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
+			return { code: sf.error, data: msg };
+		});
+	})(_cb),
 
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-
-	rename = (source, dest, flags, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc  = sf.rename(source, dest, flags);
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	rmdir = (path, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc  = sf.readlink(path);
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	setstat = (path, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc  = sf.setstat(path);
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	shutdown = (_cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			const rc  = sf.shutdown();
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-				//TODO: set flag
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	stat = (path, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
+	rename = (source, dest, flags, _cb) => callbackOrPromise(async () => {
+		return asyncOp(() => sf.rename(source, dest, flags));
+	})(_cb),
+	rmdir = (path, _cb) => callbackOrPromise(async () => {
+		return asyncOp(() => sf.rmdir(path));
+	})(_cb),
+	setstat = (path, _cb) => callbackOrPromise(async () => {
+		return asyncOp(() => sf.setstat(path));
+	})(_cb),
+	shutdown = (_cb) => callbackOrPromise(async () => {
+		return asyncOp(() => sf.shutdown());
+	})(_cb),
+	stat = (path, _cb) => callbackOrPromise(async () => {
+		return asyncOp(() => {
 			const msg = sf.stat(path, SFTP.STAT);
-			const rc  = sf.error;
-			if(rc == ERROR.NONE) {
-				res(rc, msg);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	statvfs = (path, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
+			return { code: sf.error, data: msg };
+		});
+	})(_cb),
+	statvfs = (path, _cb) => callbackOrPromise(async () => {
+		return asyncOp(() => {
 			const msg = sf.statvfs(path);
-			const rc  = sf.error;
-			if(rc == ERROR.NONE) {
-				res(rc, msg);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	symlink = (orig, dest, type, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
+			return { code: sf.error, data: msg };
+		});
+	})(_cb),
+	symlink = (orig, dest, type, _cb) => callbackOrPromise(async () => {
+		return asyncOp(() => {
 			const msg = sf.symlink(orig, dest, type);
-			const rc  = sf.error;
-			if(rc == ERROR.NONE) {
-				res(rc, msg);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	};
+			return { code: sf.error, data: msg };
+		});
+	})(_cb);
 
 	return {
 		lstat,
@@ -974,224 +652,121 @@ const channel = (_ch, _istcp) => {
 	var onmessage = oncb, onerror = oncb, onclose = oncb;
 	
 	const
-	close = (_cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			if(!ch.active) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				onerror(RC, ERRmsg[rc]);
-				return rej(rc, ERRMSG[rc]);
-			}
-			const rc  = ch.close();
-			if(rc == ERROR.NONE) {
+	close = (_cb) => callbackOrPromise(async () => {
+		if (!ch.active) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			onerror(rc, ERRMSG[rc]);
+			throw { code: rc, message: ERRMSG[rc] };
+		}
+		
+		return retryOnEagain(() => {
+			const rc = ch.close();
+			if (rc === ERROR.NONE) {
 				ch.active = false;
 				type = CHANNEL.UNKNOWN;
-
 				onclose();
-				res(rc, ERRMSG[rc]);
+				return { code: rc, message: ERRMSG[rc] };
+			} else if (rc !== ERROR.EAGAIN) {
+				throw { code: rc, message: ERRMSG[rc] };
 			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
+			return { code: ERROR.EAGAIN };
+		});
+	})(_cb),
+	eof = (_cb) => callbackOrPromise(async () => {
+		if (!ch.active) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			onerror(rc, ERRMSG[rc]);
+			throw { code: rc, message: ERRMSG[rc] };
 		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	eof = (_cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			if(!ch.active) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				onerror(RC, ERRmsg[rc]);
-				return rej(rc, ERRMSG[rc]);
-			}
-			else if(type === CHANNEL.UNKNOWN) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			const rc  = ch.eof();
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
+		if (type === CHANNEL.UNKNOWN) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
 		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	exec = (cmd, _cb)=> {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			if(!ch.active) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			else if(type === CHANNEL.UNKNOWN) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			const rc  = ch.exec(cmd);
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
+		
+		return asyncOp(() => ch.eof());
+	})(_cb),
+	exec = (cmd, _cb) => callbackOrPromise(async () => {
+		if (!ch.active) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
 		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	flush = (_cb)=> {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			if(!ch.active) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			else if(type === CHANNEL.UNKNOWN) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			const rc  = ch.flush();
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
+		if (type === CHANNEL.UNKNOWN) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
 		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	read = (_cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			if(!ch.active) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			else if(type === CHANNEL.UNKNOWN) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			const msg = ch.read();
-			res(0, msg);
+		
+		return asyncOp(() => ch.exec(cmd));
+	})(_cb),
+	flush = (_cb) => callbackOrPromise(async () => {
+		if (!ch.active) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
 		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	read_err = (_cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			if(!ch.active) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			else if(type === CHANNEL.UNKNOWN) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			const msg  = ch.read_err();
-			res(0, msg);
+		if (type === CHANNEL.UNKNOWN) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
 		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	write = (msg, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			if(!ch.active) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			else if(type === CHANNEL.UNKNOWN) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			const rc  = ch.write(msg);
-			if(rc === msg.length) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
+		
+		return asyncOp(() => ch.flush());
+	})(_cb),
+	read = (_cb) => callbackOrPromise(async () => {
+		if (!ch.active) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
 		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	write_err = (msg, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			if(!ch.active) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			else if(type === CHANNEL.UNKNOWN) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			const rc  = ch.write_err(msg);
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
+		if (type === CHANNEL.UNKNOWN) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
 		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
+		
+		const msg = ch.read();
+		return { code: 0, data: msg };
+	})(_cb),
+	read_err = (_cb) => callbackOrPromise(async () => {
+		if (!ch.active) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
+		}
+		if (type === CHANNEL.UNKNOWN) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
+		}
+		
+		const msg = ch.read_err();
+		return { code: 0, data: msg };
+	})(_cb),
+	write = (msg, _cb) => callbackOrPromise(async () => {
+		if (!ch.active) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
+		}
+		if (type === CHANNEL.UNKNOWN) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
+		}
+		
+		return retryOnEagain(() => {
+			const rc = ch.write(msg);
+			if (rc === msg.length) {
+				return { code: rc, message: ERRMSG[rc] };
+			} else if (rc !== ERROR.EAGAIN) {
+				throw { code: rc, message: ERRMSG[rc] };
+			}
+			return { code: ERROR.EAGAIN };
+		});
+	})(_cb),
+	write_err = (msg, _cb) => callbackOrPromise(async () => {
+		if (!ch.active) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
+		}
+		if (type === CHANNEL.UNKNOWN) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
+		}
+		
+		return asyncOp(() => ch.write_err(msg));
+	})(_cb),
 	chloop = () => {
 		if(!ch.active) {
 			const rc = ERROR.AUTHENTICATION_FAILED;
@@ -1217,137 +792,103 @@ const channel = (_ch, _istcp) => {
 		chloop();
 	}
 
-	const shell = (_cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
+	const shell = (_cb) => callbackOrPromise(async () => {
+		if (!ch.active) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
+		}
+		if (type !== CHANNEL.UNKNOWN) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
+		}
 
 		let has_pty = false, has_shell = false;
 
-		const _async = () => {
-			if(!ch.active) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-
-			if(type !== CHANNEL.UNKNOWN) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-
-			var rc = ERROR.NONE;
-			if(!has_pty) {
+		return retryOnEagain(() => {
+			let rc = ERROR.NONE;
+			
+			if (!has_pty) {
 				rc = ch.pty("xterm");
-				has_pty = (rc === ERROR.NONE) ? true: false;
+				has_pty = (rc === ERROR.NONE);
 			}
 
-			if(has_pty && !has_shell) {
+			if (has_pty && !has_shell) {
 				rc = ch.shell();
-				has_shell = (rc === ERROR.NONE) ? true: false;
+				has_shell = (rc === ERROR.NONE);
 			}
 			
-			if((rc !== ERROR.NONE) && (rc !== ERROR.EAGAIN)) {
-				return rej(rc, ERRMSG[rc])
+			if (rc !== ERROR.NONE && rc !== ERROR.EAGAIN) {
+				throw { code: rc, message: ERRMSG[rc] };
 			}
 
-			if(has_pty && has_shell) {
+			if (has_pty && has_shell) {
 				type = CHANNEL.SHELL;
 				chloop();
-				res(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },200)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	x11 = (screen, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		let has_x11 = false, has_pty = false, has_shell = false;;
-		const _async = () => {
-			if(!ch.active) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-
-			if(type !== CHANNEL.UNKNOWN) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-
-			var rc = ERROR.NONE;
-			if(!has_pty) {
-				rc = ch.pty("xterm");
-				has_pty = (rc === ERROR.NONE) ? true: false;
-			}
-
-			if(has_pty && !has_x11) {
-				rc = ch.x11_req(screen);
-				has_x11 = (rc === ERROR.NONE) ? true: false;
-			}
-			if((rc !== ERROR.NONE) && (rc !== ERROR.EAGAIN)) {
-				return rej(rc, ERRMSG[rc])
-			}
-
-			if(has_pty && has_x11 && !has_shell) {
-				rc = ch.shell();
-				has_shell = (rc === ERROR.NONE) ? true: false;
+				return { code: rc, message: ERRMSG[rc] };
 			}
 			
-			if((rc !== ERROR.NONE) && (rc !== ERROR.EAGAIN)) {
-				return rej(rc, ERRMSG[rc])
+			return { code: ERROR.EAGAIN };
+		}, { initialDelay: 200, maxDelay: 200 });
+	})(_cb),
+	x11 = (screen, _cb) => callbackOrPromise(async () => {
+		if (!ch.active) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
+		}
+		if (type !== CHANNEL.UNKNOWN) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
+		}
+
+		let has_x11 = false, has_pty = false, has_shell = false;
+
+		return retryOnEagain(() => {
+			let rc = ERROR.NONE;
+			
+			if (!has_pty) {
+				rc = ch.pty("xterm");
+				has_pty = (rc === ERROR.NONE);
 			}
 
-			if(has_pty && has_x11 && has_shell) {
+			if (has_pty && !has_x11) {
+				rc = ch.x11_req(screen);
+				has_x11 = (rc === ERROR.NONE);
+			}
+			
+			if (rc !== ERROR.NONE && rc !== ERROR.EAGAIN) {
+				throw { code: rc, message: ERRMSG[rc] };
+			}
+
+			if (has_pty && has_x11 && !has_shell) {
+				rc = ch.shell();
+				has_shell = (rc === ERROR.NONE);
+			}
+			
+			if (rc !== ERROR.NONE && rc !== ERROR.EAGAIN) {
+				throw { code: rc, message: ERRMSG[rc] };
+			}
+
+			if (has_pty && has_x11 && has_shell) {
 				type = CHANNEL.X11;
 				x11loop();
-				res(rc, ERRMSG[rc]);
+				return { code: rc, message: ERRMSG[rc] };
 			}
-			else {
-				setTimeout(()=> { _async() },200)
-			}
+			
+			return { code: ERROR.EAGAIN };
+		}, { initialDelay: 200, maxDelay: 200 });
+	})(_cb),
+	pty_size = (width, height, _cb) => callbackOrPromise(async () => {
+		if (!ch.active) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
+		}
+		if (type !== CHANNEL.SHELL) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
 		}
 
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	pty_size = (width, height, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
-			if(!ch.active) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-
-			// got shell first
-			if(type !== CHANNEL.SHELL) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-
-			const rc = ch.pty_size(width, height);
-			if(rc == ERROR.NONE) {
-				res(rc, ERRMSG[rc]);
-			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },100)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	}
+		return asyncOp(() => ch.pty_size(width, height));
+	})(_cb)
 	;
 
 	return {
@@ -1378,25 +919,26 @@ const createSESSION = (socket, _cb) => {
 	let has_opened = false;
 	let has_cb = false;
 
-	let count = 0;
-	const _opencb = () => {
-		setTimeout(()=> {
-			if(has_cb) return;
-			if(has_opened) {
+	// Modern connection waiting with exponential backoff
+	const waitForConnection = async () => {
+		const maxRetries = 25;
+		const checkInterval = 100;
+		
+		for (let i = 0; i < maxRetries; i++) {
+			if (has_opened) {
 				cb(0, 'OK');
 				has_cb = true;
+				return;
 			}
-			else if(++count < 25) {
-				_opencb();
-			}
-			else {
-				cb(-1, 'TIMEOUT');
-				has_cb = true;
-			}
-
-		},100);
+			await new Promise(resolve => setTimeout(resolve, checkInterval));
+		}
+		
+		if (!has_cb) {
+			cb(-1, 'TIMEOUT');
+			has_cb = true;
+		}
 	};
-	_opencb();
+	waitForConnection();
 
 	if(typeof(socket.binaryType) !== 'undefined') {
 		socket.binaryType = 'arraybuffer';
@@ -1412,8 +954,7 @@ const createSESSION = (socket, _cb) => {
 		}
 		socket.onclose = function() {
 			console.error('WebSocket closed');
-			//sess.close();
-			delete sess;
+			sess = null; // Clear reference instead of delete
 			onclose(-1, socket);
 			has_cb = true;
 		}
@@ -1433,7 +974,7 @@ const createSESSION = (socket, _cb) => {
 		});
 		socket.on('close', () => {
 			console.error('socket closed');
-			delete sess;
+			sess = null; // Clear reference instead of delete
 			onclose(-1, socket);
 			has_cb = true;
 		});
@@ -1447,28 +988,18 @@ const createSESSION = (socket, _cb) => {
 	}
 
 	const
-	login = (user, passwd, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		const _async = () => {
+	login = (user, passwd, _cb) => callbackOrPromise(async () => {
+		return retryOnEagain(() => {
 			const rc = sess.login(user, passwd);
-			if(rc == ERROR.NONE) {
+			if (rc === ERROR.NONE) {
 				has_logined = true;
-				res(rc, ERRMSG[rc]);
+				return { code: rc, message: ERRMSG[rc] };
+			} else if (rc !== ERROR.EAGAIN) {
+				throw { code: rc, message: ERRMSG[rc] };
 			}
-			else if (rc !== ERROR.EAGAIN) {
-				rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(()=> { _async() },200)
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
+			return { code: ERROR.EAGAIN };
+		}, { initialDelay: 200, maxDelay: 200 });
+	})(_cb),
 
 	close = () => {
 		if(typeof(socket.close) !== 'undefined') {
@@ -1479,100 +1010,64 @@ const createSESSION = (socket, _cb) => {
 		}
 	},
 	
-	createSFTP = (_cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
-		let sf;
-		const _async = () => {
-			if(!has_logined) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			else if(typeof(sf) === 'undefined') {
-				sf = sess.sftp();
-			}
-			else if(!sf.active) {
-				sf = sess.sftp();
-			}
-
-			if(sf.active) {
-				const rc = ERROR.NONE;
-				res(rc, sftp(sf));
-			}
-			else {
-				setTimeout(() => { _async() }, 100);
-			}
+	createSFTP = (_cb) => callbackOrPromise(async () => {
+		if (!has_logined) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
 		}
 
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
+		let sf;
+		return retryOnEagain(() => {
+			if (!sf || !sf.active) {
+				sf = sess.sftp();
+			}
+
+			if (sf.active) {
+				return { code: ERROR.NONE, data: sftp(sf) };
+			}
+			return { code: ERROR.EAGAIN };
+		});
+	})(_cb),
 	
-	createCHANNEL = (_cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
+	createCHANNEL = (_cb) => callbackOrPromise(async () => {
+		if (!has_logined) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
+		}
 
 		let ch;
-		const _async = () => {
-			if(!has_logined) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			else if(typeof(ch) === 'undefined') {
-				ch = sess.channel();
-			}
-			else if(!ch.active) {
+		return retryOnEagain(() => {
+			if (!ch || !ch.active) {
 				ch = sess.channel();
 			}
 			
-			if(ch.active) {
-				const rc = 0;
-				res(rc, channel(ch));
+			if (ch.active) {
+				return { code: 0, data: channel(ch) };
 			}
-			else {
-				setTimeout(() => { _async()}, 100);
-			}
+			return { code: ERROR.EAGAIN };
+		});
+	})(_cb),
+	createTCPIP = (ipaddr, port, _cb) => callbackOrPromise(async () => {
+		if (!has_logined) {
+			const rc = ERROR.AUTHENTICATION_FAILED;
+			throw { code: rc, message: ERRMSG[rc] };
 		}
 
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	},
-	createTCPIP = (ipaddr, port, _cb) => {
-		const iscb = (typeof(_cb) === 'function');
-		let res = _cb || nocb, rej = _cb || nocb;
-
 		let ch;
-		const _async = () => {
-			if(!has_logined) {
-				const rc = ERROR.AUTHENTICATION_FAILED;
-				return rej(rc, ERRMSG[rc]);
-			}
-			else if(typeof(ch) === 'undefined') {
-				ch = sess.tcpip(ipaddr, port);
-			}
-			else if(!ch.active) {
+		return retryOnEagain(() => {
+			if (!ch || !ch.active) {
 				ch = sess.tcpip(ipaddr, port);
 			}
 
 			const rc = sess.error;
-			if(ch.active) {
-				return res(ERROR.NONE, channel(ch, true));
+			if (ch.active) {
+				return { code: ERROR.NONE, data: channel(ch, true) };
+			} else if (rc !== ERROR.EAGAIN) {
+				throw { code: rc, message: ERRMSG[rc] };
 			}
-			else if(rc != ERROR.EAGAIN) {
-				return rej(rc, ERRMSG[rc]);
-			}
-			else {
-				setTimeout(() => { _async()}, 100);
-			}
-		}
-
-		return (iscb) ? _async() : new Promise((resolve, reject) => {
-			res = resolve; rej = reject; _async();
-		})
-	}
+			return { code: ERROR.EAGAIN };
+		});
+	})(_cb)
 	;
 
 	return {
